@@ -6008,6 +6008,9 @@ tbody tr:hover {
     .site-masthead {
         position: sticky;
         grid-template-columns: 1fr;
+        grid-template-areas:
+            "brand"
+            "nav";
         gap: 7px;
         padding: 9px 14px 0;
     }
