@@ -5151,6 +5151,7 @@ tbody tr:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     .loading-screen,
     .loading-screen-spinner,
     .loading-progress>span {
@@ -5160,6 +5161,7 @@ tbody tr:hover {
 }
 
 @media print {
+
     .loading-screen,
     .picker-powered-by {
         display: none !important;
