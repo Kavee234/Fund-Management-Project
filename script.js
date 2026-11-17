@@ -1719,3 +1719,9 @@ document.getElementById("printButton").addEventListener("click", () => window.pr
 document.getElementById("exportButton").addEventListener("click", exportCsv);
 document.getElementById("resetButton").addEventListener("click", resetRecords);
 updateEditLockButton();
+
+const loadingScreen = document.getElementById("loadingScreen");
+window.setTimeout(() => {
+    loadingScreen.classList.add("is-hidden");
+    loadingScreen.setAttribute("aria-hidden", "true");
+}, 1800);

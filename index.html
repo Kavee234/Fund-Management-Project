@@ -13,10 +13,21 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=20261117-mobile-layout">
 </head>
 
 <body>
+    <div class="loading-screen" id="loadingScreen" role="status" aria-live="polite">
+        <div class="loading-screen-card">
+            <img class="loading-screen-logo" src="assets/baahira-logo.png" alt="">
+            <span class="loading-screen-title sinhala">බාහිර ක්‍රියාකාරකම්</span>
+            <span class="loading-screen-spinner" aria-hidden="true"></span>
+            <span class="loading-screen-message">Preparing your fund</span>
+            <span class="loading-progress" aria-hidden="true"><span></span></span>
+            <span class="loading-powered-by">Powered by <strong>DP Creations</strong></span>
+        </div>
+    </div>
+
     <main class="fund-picker" id="fundPicker" aria-labelledby="fundPickerTitle">
         <div class="fund-picker-brand">
             <img class="brand-logo" src="assets/baahira-logo.png" alt="">
@@ -42,6 +53,7 @@
         </div>
         <p class="fund-picker-disclaimer">“Highly Confidential” is a label only. The 4-digit editing PIN is a
             convenience lock, not secure authentication; records stay in this browser.</p>
+        <p class="picker-powered-by powered-by">Powered by <strong>DP Creations</strong></p>
     </main>
 
     <div class="app-shell" id="appShell" hidden>
@@ -427,6 +439,7 @@
             <footer class="page-footer">
                 <span class="sinhala">අපේ එකතුවෙන්, අපේ සතුටට.</span>
                 <span>Made for good times together <span aria-hidden="true">✦</span></span>
+                <span class="powered-by">Powered by <strong>DP Creations</strong></span>
             </footer>
         </main>
     </div>
