@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f5f4ed">
+    <meta name="description"
+        content="A welcoming shared space to track contributions and celebrate the Baahira Kriyaakaarakam community.">
+    <title>Choose a fund | බාහිර ක්‍රියාකාරකම්</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <main class="fund-picker" id="fundPicker" aria-labelledby="fundPickerTitle">
+        <div class="fund-picker-brand">
+            <img class="brand-logo" src="assets/baahira-logo.png" alt="">
+            <span class="brand-name sinhala">බාහිර ක්‍රියාකාරකම්</span>
+        </div>
+        <p class="eyebrow">WELCOME</p>
+        <h1 id="fundPickerTitle" tabindex="-1">Choose a fund</h1>
+        <p class="fund-picker-copy">Select which community ledger you want to open.</p>
+        <div class="fund-choice-grid">
+            <a class="fund-choice-card" href="?fund=community">
+                <span class="fund-choice-kicker sinhala">ප්‍රධාන අරමුදල</span>
+                <strong class="sinhala">බාහිර ක්‍රියාකාරකම් අරමුදල</strong>
+                <span>Community fund · birthdays and shared activities</span>
+                <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
+            </a>
+            <a class="fund-choice-card" href="?fund=activities">
+                <span class="fund-choice-kicker">BOYS’ ACTIVITIES</span>
+                <strong>External Activities Fund <span class="confidential-label">( Highly Confidential
+                        )</span></strong>
+                <span>Trips, parties, and other activities · Rs. 100 per member, per week</span>
+                <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
+            </a>
+        </div>
+        <p class="fund-picker-disclaimer">“Highly Confidential” is a label only. The 4-digit editing PIN is a
+            convenience lock, not secure authentication; records stay in this browser.</p>
+    </main>
+
+    <div class="app-shell" id="appShell" hidden>
+        <header class="site-masthead">
+            <div class="masthead-brand">
+                <a class="brand" href="#overviewView" aria-label="Baahira Kriyaakaarakam home">
+                    <img class="brand-logo" src="assets/baahira-logo.png" alt="Baahira Kriyaakaarakam community logo">
+                    <span class="brand-copy">
+                        <span class="brand-name sinhala">බාහිර ක්‍රියාකාරකම්</span>
+                        <span class="brand-caption sinhala" id="brandCaption">අපේ එකතුව</span>
+                    </span>
+                </a>
+                <span class="masthead-tagline">A shared fund for the moments we make together.</span>
+            </div>
+            <nav class="navigation" aria-label="Main navigation">
+                <button class="nav-link active" type="button" data-view="overview" aria-current="page">
+                    <span class="nav-index">01</span> Overview
+                </button>
+                <button class="nav-link" type="button" data-view="members">
+                    <span class="nav-index">02</span> Members
+                </button>
+                <button class="nav-link" type="button" data-view="summary">
+                    <span class="nav-index">03</span> Summary
+                </button>
+                <button class="nav-link" type="button" data-view="transactions">
+                    <span class="nav-index">04</span> Transactions
+                </button>
+            </nav>
+            <div class="masthead-status">
+                <span class="online-dot" aria-hidden="true"></span>
+                Saved locally
+            </div>
+        </header>
+
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">ACTIVE COLLECTION PERIOD</p>
+                    <h1 class="ledger-heading"><span id="currentMonth"></span><span id="ledgerTitle">community
+                            ledger</span></h1>
+                </div>
+                <div class="topbar-actions">
+                    <button class="button button-quiet" id="editLockButton" type="button" aria-pressed="false">
+                        Unlock editing
+                    </button>
+                    <button class="button button-quiet" id="changeFundButton" type="button">Choose fund</button>
+                    <label class="month-picker-group" for="monthSelector">
+                        <span>MONTH</span>
+                        <input id="monthSelector" type="month" aria-label="Select collection month">
+                    </label>
+                    <span class="local-badge"><span class="online-dot" aria-hidden="true"></span> Local records</span>
+                    <button class="button button-quiet" id="printButton" type="button">
+                        <span aria-hidden="true">⤓</span> Print report
+                    </button>
+                </div>
+            </header>
+
+            <section class="view-panel" id="overviewView" aria-labelledby="welcomeTitle">
+                <div class="welcome-card">
+                    <div class="welcome-copy">
+                        <span class="welcome-kicker">BAAHIRA COMMUNITY FUND</span>
+                        <h2 id="welcomeTitle">A little together.<br>A lot to celebrate.</h2>
+                        <p>Keep every collection clear, share event costs fairly, and make room for the moments that
+                            matter.</p>
+                        <div class="hero-actions">
+                            <button class="button button-light" type="button" data-open-view="members">
+                                Open member list <span aria-hidden="true">→</span>
+                            </button>
+                            <button class="hero-secondary-action" type="button" data-open-view="transactions">
+                                Record an event cost <span aria-hidden="true">↗</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="hero-spotlight" aria-label="Weekly contribution details">
+                        <div class="spotlight-label-row">
+                            <span>THE SHARED POT</span>
+                            <span aria-hidden="true">✦</span>
+                        </div>
+                        <strong>Rs. 100</strong>
+                        <span class="spotlight-caption">per member, every week</span>
+                        <div class="spotlight-divider"></div>
+                        <div class="spotlight-foot">
+                            <span class="spotlight-avatar-stack" aria-hidden="true"><i>S</i><i>H</i><i>+</i></span>
+                            <span>All <span id="heroMemberCount">21</span> members<br>in it together</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">AT A GLANCE</p>
+                        <h2>Your fund, in a nutshell</h2>
+                    </div>
+                    <span class="period-pill"><span class="online-dot" aria-hidden="true"></span> Selected month</span>
+                </div>
+
+                <div class="stats-grid">
+                    <article class="stat-card">
+                        <div class="stat-top"><span class="stat-icon icon-members" aria-hidden="true">♧</span><span
+                                class="stat-caption" id="memberStatCaption">COMMUNITY</span></div>
+                        <p class="stat-value" id="membersCount">0</p>
+                        <p class="stat-label">Total members</p>
+                        <span class="stat-foot">The whole crew, together</span>
+                    </article>
+                    <article class="stat-card">
+                        <div class="stat-top"><span class="stat-icon icon-collected" aria-hidden="true">↗</span><span
+                                class="stat-caption">COLLECTED</span></div>
+                        <p class="stat-value">Rs. <span id="totalCollected">0</span></p>
+                        <p class="stat-label">Collected for selected month</p>
+                        <span class="stat-foot"><span id="paymentsCount">0</span> weekly contributions received</span>
+                    </article>
+                    <article class="stat-card">
+                        <div class="stat-top"><span class="stat-icon icon-pending" aria-hidden="true">◷</span><span
+                                class="stat-caption">TO COLLECT</span></div>
+                        <p class="stat-value">Rs. <span id="totalDebt">0</span></p>
+                        <p class="stat-label">Still outstanding</p>
+                        <span class="stat-foot">A gentle nudge goes a long way</span>
+                    </article>
+                    <article class="stat-card progress-stat">
+                        <div class="stat-top"><span class="stat-icon icon-progress" aria-hidden="true">✦</span><span
+                                class="stat-caption">MONTHLY GOAL</span></div>
+                        <p class="stat-value"><span id="collectionPercent">0</span><span class="percent-sign">%</span>
+                        </p>
+                        <p class="stat-label">Contribution progress</p>
+                        <div class="progress-track" role="progressbar" aria-label="Monthly contribution progress"
+                            aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressBar"><span></span></div>
+                    </article>
+                </div>
+
+                <div class="content-grid">
+                    <section class="panel contribution-panel" aria-labelledby="contributionTitle">
+                        <div class="panel-heading">
+                            <div>
+                                <p class="eyebrow">WEEK BY WEEK</p>
+                                <h2 id="contributionTitle">Contribution rhythm</h2>
+                            </div>
+                            <span class="chart-legend"><i></i> Collected</span>
+                        </div>
+                        <div class="chart-area" id="weeklyChart" aria-label="Weekly contribution chart"></div>
+                        <div class="chart-footnote">Choose a member to record their Rs. 100 weekly contributions.</div>
+                    </section>
+
+                    <section class="panel birthday-panel" aria-labelledby="birthdayTitle">
+                        <div class="panel-heading">
+                            <div>
+                                <p class="eyebrow">A REASON TO CELEBRATE</p>
+                                <h2 id="birthdayTitle">Coming up next</h2>
+                            </div>
+                            <span class="birthday-icon" aria-hidden="true">✿</span>
+                        </div>
+                        <div id="birthdayList" class="birthday-list"></div>
+                        <button class="text-button" type="button" data-open-view="members">See all members <span
+                                aria-hidden="true">→</span></button>
+                    </section>
+                </div>
+
+                <section class="panel recent-panel" aria-labelledby="recentTitle">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="eyebrow">PAYMENT HISTORY</p>
+                            <h2 id="recentTitle">Recent collections</h2>
+                        </div>
+                        <button class="text-button" type="button" data-open-view="members">Add a collection <span
+                                aria-hidden="true">→</span></button>
+                    </div>
+                    <div id="recentCollections" class="recent-collections"></div>
+                </section>
+            </section>
+
+            <section class="view-panel" id="membersView" aria-labelledby="membersTitle" hidden>
+                <div class="members-intro">
+                    <div>
+                        <p class="eyebrow" id="memberSectionLabel">YOUR COMMUNITY</p>
+                        <h2 id="membersTitle">Meet the members</h2>
+                        <p class="intro-copy">Choose any member to record a collection and create their receipt.</p>
+                    </div>
+                    <span class="member-total" id="visibleMemberCount"></span>
+                </div>
+
+                <div class="panel member-directory">
+                    <div class="table-toolbar">
+                        <label class="search-box">
+                            <span aria-hidden="true">⌕</span>
+                            <input id="memberSearch" type="search" placeholder="Search members..."
+                                aria-label="Search members">
+                        </label>
+                        <label class="filter-label" for="statusFilter">Show</label>
+                        <select id="statusFilter" class="filter-select">
+                            <option value="all">Everyone</option>
+                            <option value="outstanding">Has outstanding</option>
+                            <option value="complete">Fully paid</option>
+                        </select>
+                    </div>
+                    <div class="member-card-grid" id="membersGrid"></div>
+                    <div class="table-note"><span class="online-dot" aria-hidden="true"></span> Changes are saved
+                        automatically in this browser.</div>
+                </div>
+            </section>
+
+            <section class="view-panel" id="summaryView" aria-labelledby="summaryTitle" hidden>
+                <div class="members-intro">
+                    <div>
+                        <p class="eyebrow">ALL-MEMBER TOTALS</p>
+                        <h2 id="summaryTitle">Fund summary</h2>
+                        <p class="intro-copy">See each member’s collections, event share, and savings carried forward
+                            across months.</p>
+                    </div>
+                    <div class="summary-actions">
+                        <button class="button button-danger" id="resetButton" type="button" disabled
+                            title="Unlock editing to enable record resets">Reset records</button>
+                        <button class="button button-primary" id="exportButton" type="button"><span
+                                aria-hidden="true">↓</span> Export CSV</button>
+                        <span class="reset-access-note" id="resetAccessNote">
+                            Unlock editing with the PIN to reset records.
+                        </span>
+                    </div>
+                </div>
+                <p class="reset-message" id="resetMessage" role="status" aria-live="polite"></p>
+                <div class="summary-strip">
+                    <article class="summary-chip">
+                        <span>Total members</span>
+                        <strong id="summaryMembersCount">0</strong>
+                    </article>
+                    <article class="summary-chip">
+                        <span>Total collected</span>
+                        <strong>Rs. <span id="summaryCollected">0</span></strong>
+                    </article>
+                    <article class="summary-chip">
+                        <span>Event expenses</span>
+                        <strong>Rs. <span id="summaryExpenses">0</span></strong>
+                    </article>
+                    <article class="summary-chip">
+                        <span>Fund balance through month</span>
+                        <strong>Rs. <span id="summaryBalance">0</span></strong>
+                    </article>
+                    <article class="summary-chip">
+                        <span>Still outstanding</span>
+                        <strong>Rs. <span id="summaryOutstanding">0</span></strong>
+                    </article>
+                    <article class="summary-chip">
+                        <span>Contribution progress</span>
+                        <strong><span id="summaryPercent">0</span>%</strong>
+                    </article>
+                </div>
+                <div class="panel summary-table-panel">
+                    <div class="panel-heading summary-table-heading">
+                        <div>
+                            <p class="eyebrow">MEMBER-BY-MEMBER</p>
+                            <h2>Contribution breakdown · <span id="summaryMonth"></span></h2>
+                        </div>
+                        <span class="member-total" id="summaryRowCount">21 members</span>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th scope="col">MEMBER</th>
+                                    <th class="birthday-column" scope="col">BIRTHDAY</th>
+                                    <th scope="col">WEEK 01</th>
+                                    <th scope="col">WEEK 02</th>
+                                    <th scope="col">WEEK 03</th>
+                                    <th scope="col">WEEK 04</th>
+                                    <th scope="col">OUTSTANDING (RS.)</th>
+                                    <th scope="col">CONTRIBUTIONS (RS.)</th>
+                                    <th scope="col">EXTRA COLLECTIONS (RS.)</th>
+                                    <th scope="col">EXPENSE SHARE (RS.)</th>
+                                    <th scope="col">SAVINGS (RS.)</th>
+                                    <th scope="col">ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summaryTable"></tbody>
+                        </table>
+                    </div>
+                    <div class="table-note"><span class="online-dot" aria-hidden="true"></span> Totals include all
+                        <span id="summaryNoteMembersCount">21</span> members. Use Add collection to record a payment.
+                    </div>
+                </div>
+            </section>
+
+            <section class="view-panel" id="transactionsView" aria-labelledby="transactionsTitle" hidden>
+                <div class="members-intro">
+                    <div>
+                        <p class="eyebrow">MONEY IN · MONEY OUT</p>
+                        <h2 id="transactionsTitle">Transactions &amp; expenses</h2>
+                        <p class="intro-copy">Record event costs and see how each member’s savings change.</p>
+                    </div>
+                </div>
+
+                <div class="transactions-stats">
+                    <article class="summary-chip">
+                        <span>Collections</span>
+                        <strong>Rs. <span id="transactionsCollected">0</span></strong>
+                    </article>
+                    <article class="summary-chip">
+                        <span>Event expenses</span>
+                        <strong>Rs. <span id="transactionsExpenses">0</span></strong>
+                    </article>
+                    <article class="summary-chip">
+                        <span>Fund balance through month</span>
+                        <strong>Rs. <span id="transactionsBalance">0</span></strong>
+                    </article>
+                </div>
+                <p class="balance-note">Member savings and the fund balance carry forward across months: collections add
+                    to each member’s balance, while selected event shares are deducted. Negative balances carry forward.
+                </p>
+
+                <section class="panel expense-form-panel" aria-labelledby="expenseTitle">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="eyebrow">SPLIT AN EVENT COST</p>
+                            <h2 id="expenseTitle">Add an expense</h2>
+                        </div>
+                        <span class="birthday-icon" aria-hidden="true">↘</span>
+                    </div>
+                    <form id="expenseForm">
+                        <div class="expense-fields">
+                            <label class="form-field" for="expenseEventName">
+                                <span>Event name</span>
+                                <input id="expenseEventName" name="eventName" type="text" maxlength="80"
+                                    placeholder="e.g. Annual trip" required>
+                            </label>
+                            <label class="form-field" for="expenseCost">
+                                <span>Total expense (Rs.)</span>
+                                <input id="expenseCost" name="cost" type="number" min="0.01" step="0.01"
+                                    placeholder="0.00" required>
+                            </label>
+                        </div>
+                        <div class="expense-members-heading">
+                            <div>
+                                <h3>Who shares this expense?</h3>
+                                <p>Select participating members. The total is divided equally between them.</p>
+                            </div>
+                            <div class="selection-actions">
+                                <button class="text-button" id="selectAllExpenseMembers" type="button">Select
+                                    all</button>
+                                <button class="text-button" id="clearExpenseMembers" type="button">Clear</button>
+                            </div>
+                        </div>
+                        <div class="expense-member-grid" id="expenseMembers"></div>
+                        <div class="expense-preview">
+                            <span id="expenseSharePreview">Select members to preview their share.</span>
+                            <strong id="expenseCostPreview">Rs. 0</strong>
+                        </div>
+                        <p class="form-message" id="expenseMessage" role="status" aria-live="polite"></p>
+                        <div class="expense-form-actions">
+                            <span>Recorded under <strong id="expenseMonth"></strong></span>
+                            <button class="button button-primary" type="submit">Add expense &amp; update
+                                savings</button>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="panel transaction-ledger-panel" aria-labelledby="ledgerTitle">
+                    <div class="panel-heading ledger-heading">
+                        <div>
+                            <p class="eyebrow">SELECTED-MONTH LEDGER</p>
+                            <h2 id="ledgerTitle">Transaction History</h2>
+                        </div>
+                        <label class="transaction-filter">
+                            <span>Member</span>
+                            <select id="transactionFilter" aria-label="Filter transactions by member"></select>
+                        </label>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th scope="col">DATE</th>
+                                    <th scope="col">MEMBER</th>
+                                    <th scope="col">TYPE</th>
+                                    <th scope="col">DETAILS</th>
+                                    <th scope="col">AMOUNT (RS.)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionsTable"></tbody>
+                        </table>
+                    </div>
+                    <div class="table-note">Contributions are shown as money in; each member’s share of an expense is
+                        shown as money out.</div>
+                </section>
+            </section>
+
+            <footer class="page-footer">
+                <span class="sinhala">අපේ එකතුවෙන්, අපේ සතුටට.</span>
+                <span>Made for good times together <span aria-hidden="true">✦</span></span>
+            </footer>
+        </main>
+    </div>
+
+    <div class="modal-backdrop" id="pinModal" hidden>
+        <section class="modal-dialog pin-dialog" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
+            <div class="modal-heading">
+                <div>
+                    <p class="eyebrow">EDIT ACCESS</p>
+                    <h2 id="pinTitle">Unlock editing</h2>
+                </div>
+                <button class="icon-button" type="button" data-close-pin aria-label="Close">×</button>
+            </div>
+            <p class="modal-intro">Enter the PIN to record collections, add expenses, or reset records.</p>
+            <form id="pinForm">
+                <label class="form-field pin-field" for="editPin">
+                    <span>PIN</span>
+                    <input id="editPin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4"
+                        autocomplete="off" required>
+                </label>
+                <p class="form-message" id="pinMessage" role="status" aria-live="polite"></p>
+                <p class="pin-disclaimer">This 4-digit PIN is a convenience lock only. It can be bypassed and is not
+                    secure authentication.</p>
+                <div class="modal-actions">
+                    <button class="button button-quiet" type="button" data-close-pin>Cancel</button>
+                    <button class="button button-primary" type="submit">Unlock</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
+    <div class="modal-backdrop" id="collectionModal" hidden>
+        <section class="modal-dialog collection-dialog" role="dialog" aria-modal="true"
+            aria-labelledby="collectionTitle">
+            <div class="modal-heading">
+                <div>
+                    <p class="eyebrow">RECORD A PAYMENT</p>
+                    <h2 id="collectionTitle">Add collection</h2>
+                </div>
+                <button class="icon-button" type="button" data-close-collection aria-label="Close">×</button>
+            </div>
+            <p class="modal-intro" id="collectionMemberName"></p>
+            <button class="text-button collection-mode-toggle" id="collectionModeToggle" type="button">
+                Record an additional amount
+            </button>
+            <div class="week-options" id="collectionWeeks"></div>
+            <div class="additional-collection-fields" id="additionalCollectionFields" hidden>
+                <label class="form-field" for="additionalCollectionAmount">
+                    <span>Additional amount (Rs.)</span>
+                    <input id="additionalCollectionAmount" type="number" min="0.01" step="0.01" placeholder="0.00">
+                </label>
+                <label class="form-field" for="additionalCollectionNote">
+                    <span>Purpose or note (optional)</span>
+                    <input id="additionalCollectionNote" type="text" maxlength="100"
+                        placeholder="e.g. Extra trip contribution">
+                </label>
+            </div>
+            <div class="collection-controls">
+                <label for="paymentMethod">Payment method</label>
+                <select id="paymentMethod">
+                    <option value="Cash">Cash</option>
+                    <option value="Bank transfer">Bank transfer</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="collection-total">
+                <span>Collection total</span>
+                <strong>Rs. <span id="collectionAmount">0</span></strong>
+            </div>
+            <p class="form-message" id="collectionMessage" role="status" aria-live="polite"></p>
+            <div class="modal-actions">
+                <button class="button button-quiet" type="button" data-close-collection>Cancel</button>
+                <button class="button button-primary" id="saveCollectionButton" type="button" disabled>
+                    Save collection &amp; create receipt
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <div class="modal-backdrop receipt-backdrop" id="receiptModal" hidden>
+        <section class="modal-dialog receipt-dialog" role="dialog" aria-modal="true" aria-labelledby="receiptTitle">
+            <button class="icon-button receipt-close" type="button" data-close-receipt
+                aria-label="Close receipt">×</button>
+            <article class="receipt-paper" id="receiptPaper">
+                <div class="receipt-brand">
+                    <img src="assets/baahira-logo.png" alt="">
+                    <div>
+                        <p class="eyebrow" id="receiptBrandKicker">BAAHIRA KRIYAAKAARAKAM</p>
+                        <h2 class="sinhala" id="receiptBrandTitle">බාහිර ක්‍රියාකාරකම් අපේ එකතුව</h2>
+                    </div>
+                </div>
+                <div class="receipt-title-row">
+                    <div>
+                        <p class="eyebrow">PAYMENT CONFIRMATION</p>
+                        <h3 id="receiptTitle">Payment receipt</h3>
+                    </div>
+                    <span class="receipt-stamp">PAID</span>
+                </div>
+                <div class="receipt-meta">
+                    <span>Receipt number</span><strong id="receiptNumber"></strong>
+                    <span>Date</span><strong id="receiptDate"></strong>
+                </div>
+                <div class="receipt-divider"></div>
+                <div class="receipt-detail">
+                    <span>Received from</span><strong id="receiptMember"></strong>
+                </div>
+                <div class="receipt-detail">
+                    <span id="receiptContributionLabel">Contribution</span><strong id="receiptWeeks"></strong>
+                </div>
+                <div class="receipt-detail">
+                    <span>Collection month</span><strong id="receiptMonth"></strong>
+                </div>
+                <div class="receipt-detail">
+                    <span>Payment method</span><strong id="receiptMethod"></strong>
+                </div>
+                <div class="receipt-total">
+                    <span>Total received</span>
+                    <strong>Rs. <span id="receiptAmount"></span></strong>
+                </div>
+                <p class="receipt-thanks sinhala">ඔබගේ දායකත්වයට ස්තුතියි!</p>
+                <p class="receipt-footnote">This is a soft receipt for your community fund contribution.</p>
+            </article>
+            <p class="form-message receipt-message" id="receiptMessage" role="status" aria-live="polite"></p>
+            <div class="modal-actions receipt-actions">
+                <button class="button button-quiet" id="receiptPngButton" type="button">Save as image</button>
+                <button class="button button-quiet" id="receiptPdfButton" type="button">Print / Save PDF</button>
+                <button class="button button-primary" id="anotherCollectionButton" type="button">Collect for another
+                    member</button>
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
