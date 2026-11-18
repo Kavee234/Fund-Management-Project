@@ -1937,8 +1937,10 @@ if (hasSelectedFund) {
         ? "External Activities Fund ( Highly Confidential )"
         : "බාහිර ක්‍රියාකාරකම් අරමුදල";
     document.title = `${fundName} | ${isActivitiesFund ? "Activities ledger" : "Community fund"}`;
-    document.getElementById("ledgerTitle").textContent =
+    document.getElementById("currentLedgerTitle").textContent =
         isActivitiesFund ? "activities ledger" : "community ledger";
+    document.getElementById("transactionsLedgerTitle").textContent =
+        isActivitiesFund ? "Activities transaction history" : "Transaction history";
     document.getElementById("brandCaption").textContent =
         isActivitiesFund ? "External Activities Fund" : "අපේ එකතුව";
     document.getElementById("welcomeTitle").textContent = isActivitiesFund
