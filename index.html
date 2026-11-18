@@ -7,13 +7,13 @@
     <meta name="theme-color" content="#f5f4ed">
     <meta name="description"
         content="A welcoming shared space to track contributions and celebrate the Baahira Kriyaakaarakam community.">
-    <title>Choose a fund | බාහිර ක්‍රියාකාරකම්</title>
+    <title>External Activities Fund</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20261118-member-receipts">
+    <link rel="stylesheet" href="style.css?v=20261119-interface-refresh">
 </head>
 
 <body>
@@ -28,7 +28,30 @@
         </div>
     </div>
 
-    <main class="fund-picker" id="fundPicker" aria-labelledby="fundPickerTitle">
+    <main class="intro-screen" id="introScreen" aria-labelledby="introTitle" hidden>
+        <div class="intro-screen-brand">
+            <img class="brand-logo" src="assets/baahira-logo.png" alt="">
+            <span class="brand-name sinhala">බාහිර ක්‍රියාකාරකම්</span>
+        </div>
+        <p class="eyebrow">WELCOME TO OUR COMMUNITY FUND</p>
+        <h1 id="introTitle">A shared fund for the moments we make together.</h1>
+        <p class="intro-description">This site helps our community keep track of contributions, birthdays, and shared
+            activity costs, with clear records for everyone.</p>
+        <div class="fund-leaders" aria-label="Fund committee">
+            <div class="fund-leader">
+                <span>Chairman of the Fund</span>
+                <strong>Dulanjana Niluminda</strong>
+            </div>
+            <div class="fund-leader">
+                <span>Treasurer of the Fund</span>
+                <strong>Dihen Perera</strong>
+            </div>
+        </div>
+        <button class="button button-primary intro-enter-button" id="enterSiteButton" type="button">Enter <span
+                aria-hidden="true">→</span></button>
+    </main>
+
+    <main class="fund-picker" id="fundPicker" aria-labelledby="fundPickerTitle" hidden>
         <div class="fund-picker-brand">
             <img class="brand-logo" src="assets/baahira-logo.png" alt="">
             <span class="brand-name sinhala">බාහිර ක්‍රියාකාරකම්</span>
@@ -629,7 +652,7 @@
 
     <script src="supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="script.js?v=20261119-shared-member-view"></script>
+    <script src="script.js?v=20261119-smooth-transitions"></script>
 </body>
 
 </html>

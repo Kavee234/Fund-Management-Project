@@ -1427,6 +1427,13 @@ function renderBirthdays() {
     });
 }
 
+function scrollToPageTop() {
+    window.scrollTo({
+        top: 0,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+    });
+}
+
 function showView(viewName) {
     ["overview", "members", "summary", "transactions"].forEach(name => {
         const panel = document.getElementById(`${name}View`);
@@ -1449,6 +1456,8 @@ function showView(viewName) {
             button.removeAttribute("aria-current");
         }
     });
+
+    scrollToPageTop();
 }
 
 async function selectMonth(monthKey) {
@@ -2016,8 +2025,15 @@ async function downloadReceiptImage() {
     }
 }
 
-document.getElementById("fundPicker").hidden = shouldOpenFund;
+document.getElementById("introScreen").hidden = shouldOpenFund || hasSelectedFund;
+document.getElementById("fundPicker").hidden = shouldOpenFund || !hasSelectedFund;
 document.getElementById("appShell").hidden = sharedBackendConfigured || !shouldOpenFund;
+document.getElementById("enterSiteButton").addEventListener("click", () => {
+    document.getElementById("introScreen").hidden = true;
+    document.getElementById("fundPicker").hidden = false;
+    document.getElementById("fundPickerTitle").focus({ preventScroll: true });
+    scrollToPageTop();
+});
 if (hasSelectedFund) {
     const fundName = isActivitiesFund
         ? "External Activities Fund"
@@ -2053,7 +2069,8 @@ document.getElementById("changeFundButton").addEventListener("click", () => {
     document.getElementById("appShell").hidden = true;
     document.getElementById("fundPicker").hidden = false;
     window.history.replaceState(null, "", window.location.pathname);
-    document.getElementById("fundPickerTitle").focus();
+    document.getElementById("fundPickerTitle").focus({ preventScroll: true });
+    scrollToPageTop();
 });
 document.querySelectorAll("[data-select-fund]").forEach(button => {
     button.addEventListener("click", () => {

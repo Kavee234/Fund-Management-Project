@@ -28,6 +28,7 @@ body {
 
 html {
     scroll-behavior: smooth;
+    scroll-padding-top: 96px;
 }
 
 button,
@@ -319,13 +320,13 @@ select,
 }
 
 .view-panel:not([hidden]) {
-    animation: view-enter .38s cubic-bezier(.22, 1, .36, 1) both;
+    animation: view-enter .46s cubic-bezier(.22, 1, .36, 1) both;
 }
 
 @keyframes view-enter {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(12px);
     }
 
     to {
@@ -5007,6 +5008,205 @@ tbody tr:hover {
 
     .topbar-actions {
         justify-content: space-between;
+    }
+}
+
+.intro-screen[hidden] {
+    display: none;
+}
+
+.intro-screen {
+    display: flex;
+    min-height: 100vh;
+    min-height: 100svh;
+    flex-direction: column;
+    align-items: center;
+    width: min(100% - 40px, 820px);
+    margin: 0 auto;
+    padding: clamp(28px, 6vh, 64px) 0 30px;
+    text-align: center;
+    animation: screen-enter .48s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.intro-screen-brand {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    margin-bottom: clamp(24px, 5vh, 46px);
+}
+
+.intro-screen-brand .brand-logo {
+    width: 76px;
+    height: 76px;
+}
+
+.intro-screen>.eyebrow {
+    margin: 0 0 12px;
+}
+
+.intro-screen h1 {
+    max-width: 760px;
+    margin: 0;
+    font-size: clamp(34px, 6vw, 58px);
+    line-height: 1.12;
+}
+
+.intro-description {
+    max-width: 600px;
+    margin: 18px 0 30px;
+    color: var(--muted);
+    font-size: clamp(15px, 2vw, 17px);
+    line-height: 1.75;
+}
+
+.fund-leaders {
+    display: grid;
+    width: min(100%, 560px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.fund-leader {
+    display: grid;
+    gap: 7px;
+    padding: 19px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--white);
+    box-shadow: var(--shadow);
+}
+
+.fund-leader span {
+    color: var(--green);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.fund-leader strong {
+    font-size: 16px;
+}
+
+.intro-enter-button {
+    display: inline-flex;
+    min-width: 160px;
+    justify-content: center;
+    gap: 12px;
+    margin-top: auto;
+    padding: 13px 24px;
+}
+
+@media screen and (max-width: 560px) {
+    .intro-screen {
+        width: min(100% - 32px, 460px);
+    }
+
+    .fund-leaders {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .fund-leader {
+        padding: 15px;
+    }
+
+    .intro-enter-button {
+        width: 100%;
+    }
+}
+
+@media screen {
+    .site-masthead {
+        min-height: 82px;
+        border-bottom-color: #e7e0d4;
+        box-shadow: 0 6px 22px rgba(62, 48, 47, .07);
+    }
+
+    .navigation {
+        gap: 6px;
+    }
+
+    .nav-link {
+        min-height: 40px;
+        padding: 0 12px;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+    }
+
+    .nav-link:hover {
+        border-color: #e7e0d4;
+        border-radius: 999px;
+        background: #fff9ef;
+        transform: translateY(-1px);
+    }
+
+    .nav-link.active {
+        border-color: #d6e5db;
+        border-radius: 999px;
+        background: #eaf3ed;
+        color: #245c57;
+    }
+
+    .topbar {
+        align-items: center;
+        gap: 16px;
+        padding: 16px 19px;
+        border: 1px solid #e8e1d5;
+        border-radius: 16px;
+        background: rgba(255, 253, 248, .78);
+        box-shadow: 0 8px 22px rgba(62, 48, 47, .045);
+    }
+
+    .topbar-actions {
+        gap: 9px;
+    }
+
+    .topbar-actions .button,
+    .button-quiet {
+        border-radius: 10px;
+    }
+
+    .button-quiet {
+        border-color: #e4dfd4;
+        background: #fffdf8;
+    }
+
+    .button-quiet:hover:not(:disabled) {
+        border-color: #cddfd5;
+        background: #edf5ef;
+        color: #245c57;
+    }
+
+    .welcome-card {
+        border-radius: 22px;
+        box-shadow: 0 18px 38px rgba(91, 62, 43, .12);
+    }
+
+    .stat-card,
+    .summary-chip,
+    .panel,
+    .member-directory,
+    .summary-table-panel,
+    .expense-form-panel,
+    .transaction-ledger-panel {
+        border-radius: 15px;
+    }
+
+    .stat-card,
+    .summary-chip {
+        transition: transform .18s ease, box-shadow .18s ease;
+    }
+
+    .stat-card:hover,
+    .summary-chip:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 13px 28px rgba(62, 48, 47, .09);
+    }
+
+    .member-card {
+        border-radius: 12px;
     }
 }
 
