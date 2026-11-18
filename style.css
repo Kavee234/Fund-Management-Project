@@ -290,11 +290,15 @@ button {
 }
 
 #editLockButton[hidden],
-.share-notice[hidden] {
+#importLocalButton[hidden],
+#localPinField[hidden],
+#adminEmailField[hidden],
+#adminPasswordField[hidden],
+.sync-notice[hidden] {
     display: none;
 }
 
-.share-notice {
+.sync-notice {
     margin: -12px 0 20px;
     padding: 11px 14px;
     border: 1px solid #dce8dd;
@@ -1830,14 +1834,18 @@ tbody tr:hover {
 }
 
 .receipt-stamp {
-    padding: 6px 10px;
+    padding: 7px 11px;
     border: 1px solid #b8d5bc;
     border-radius: 5px;
     color: #4a855d;
-    font-size: 10px;
+    font-size: 13px;
     font-weight: 700;
     letter-spacing: 1.2px;
     transform: rotate(-5deg);
+}
+
+.transaction-receipt-button {
+    white-space: nowrap;
 }
 
 .receipt-meta {

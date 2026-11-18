@@ -44,6 +44,10 @@ const activitiesMembers = [
 const fundMode = new URLSearchParams(window.location.search).get("fund");
 const hasSelectedFund = fundMode === "community" || fundMode === "activities";
 const isActivitiesFund = fundMode === "activities";
+const activitiesAccessStorageKey = "activitiesFundAccess";
+const hasActivitiesFundAccess = !isActivitiesFund ||
+    sessionStorage.getItem(activitiesAccessStorageKey) === "granted";
+const shouldOpenFund = hasSelectedFund && hasActivitiesFundAccess;
 const members = isActivitiesFund ? activitiesMembers : communityMembers;
 const receiptBrandName = isActivitiesFund
     ? "External Activities Fund"
@@ -55,11 +59,31 @@ const monthlyStorageKey = `${storagePrefix}MonthlyData`;
 const activeMonthStorageKey = `${storagePrefix}ActiveMonth`;
 const receiptsStorageKey = `${storagePrefix}Receipts`;
 const expensesStorageKey = `${storagePrefix}Expenses`;
-let sharedSnapshotError = "";
-const sharedSnapshot = loadSharedSnapshot();
-const isSharedView = sharedSnapshot !== null;
+const supabaseConfig = window.FUND_APP_CONFIG || {};
+const sharedBackendConfigured = Boolean(supabaseConfig.url || supabaseConfig.anonKey);
+let supabaseClient = null;
+let sharedBackendReady = !sharedBackendConfigured;
+let sharedBackendError = "";
+let sharedRevision = 0;
+let authenticatedAdmin = false;
+let localImportAvailable = false;
+let localImportData = null;
+if (sharedBackendConfigured) {
+    try {
+        if (!supabaseConfig.url || !supabaseConfig.anonKey) {
+            throw new Error("Both the Supabase project URL and publishable key are required.");
+        }
+        if (!window.supabase || typeof window.supabase.createClient !== "function") {
+            throw new Error("The Supabase client library did not load.");
+        }
+        supabaseClient = window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey);
+    } catch (error) {
+        sharedBackendError = error.message;
+        console.error("Could not initialize the shared fund database.", error);
+    }
+}
 const currentMonthKey = getMonthKey(new Date());
-const savedActiveMonth = sharedSnapshot ? sharedSnapshot.activeMonth : localStorage.getItem(activeMonthStorageKey);
+const savedActiveMonth = localStorage.getItem(activeMonthStorageKey);
 let activeMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(savedActiveMonth || "") ? savedActiveMonth : currentMonthKey;
 const summaryTable = document.getElementById("summaryTable");
 const memberGrid = document.getElementById("membersGrid");
@@ -69,10 +93,12 @@ const monthSelector = document.getElementById("monthSelector");
 const transactionFilter = document.getElementById("transactionFilter");
 const expenseMembers = document.getElementById("expenseMembers");
 const storageStatus = document.querySelector(".table-note");
+const activitiesPinModal = document.getElementById("activitiesPinModal");
 const pinModal = document.getElementById("pinModal");
 const collectionModal = document.getElementById("collectionModal");
 const receiptModal = document.getElementById("receiptModal");
 const editPinDigest = "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
+const activitiesPinDigest = "0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c";
 let monthlyContributions = loadMonthlyData();
 let contributions = monthlyContributions[activeMonth] || createEmptyContributions();
 monthlyContributions[activeMonth] = contributions;
@@ -84,94 +110,69 @@ let editingUnlocked = false;
 let pendingEditAction = null;
 let collectionMode = "weekly";
 
-function loadSharedSnapshot() {
-    if (!window.location.hash.startsWith("#share=")) {
-        return null;
-    }
-
-    try {
-        const encodedData = window.location.hash.slice("#share=".length).replace(/-/g, "+").replace(/_/g, "/");
-        if (!encodedData || encodedData.length > 500000) {
-            throw new RangeError("The shared snapshot is empty or too large.");
-        }
-        const binaryData = atob(encodedData.padEnd(Math.ceil(encodedData.length / 4) * 4, "="));
-        const bytes = Uint8Array.from(binaryData, character => character.charCodeAt(0));
-        const snapshot = JSON.parse(new TextDecoder().decode(bytes));
-        const expectedFund = isActivitiesFund ? "activities" : "community";
-        const validMonth = month => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
-        if (!snapshot || snapshot.version !== 1 || snapshot.fund !== expectedFund ||
-            !validMonth(snapshot.activeMonth) || !snapshot.monthlyContributions ||
-            Array.isArray(snapshot.monthlyContributions) ||
-            typeof snapshot.monthlyContributions !== "object" ||
-            !Array.isArray(snapshot.receipts) || !Array.isArray(snapshot.expenses)) {
-            throw new TypeError("The shared snapshot has an unsupported or invalid format.");
-        }
-
-        const monthlyContributions = {};
-        Object.entries(snapshot.monthlyContributions).forEach(([month, monthData]) => {
-            if (!validMonth(month) || !Array.isArray(monthData)) {
-                throw new TypeError("The shared snapshot contains invalid monthly contributions.");
-            }
-            monthlyContributions[month] = normalizeContributions(monthData);
-        });
-        const validReceipts = snapshot.receipts.every(receipt =>
-            receipt && typeof receipt.id === "string" &&
-            Number.isInteger(receipt.memberIndex) && receipt.memberIndex >= 0 &&
-            receipt.memberIndex < members.length &&
-            typeof receipt.memberName === "string" && validMonth(receipt.month) &&
-            typeof receipt.date === "string" && !Number.isNaN(Date.parse(receipt.date)) &&
-            Number.isFinite(receipt.amount) && receipt.amount >= 0 &&
-            (!receipt.weeks || (Array.isArray(receipt.weeks) &&
-                receipt.weeks.every(week => Number.isInteger(week) && week >= 1 && week <= 4))));
-        if (!validReceipts) {
-            throw new TypeError("The shared snapshot contains invalid receipt records.");
-        }
-
-        return {
-            activeMonth: snapshot.activeMonth,
-            monthlyContributions,
-            receipts: snapshot.receipts,
-            expenses: snapshot.expenses
-        };
-    } catch (error) {
-        console.error("Could not read the shared fund snapshot.", error);
-        sharedSnapshotError = "This share link is invalid or damaged. Showing this browser’s locally saved records instead.";
-        return null;
-    }
-}
-
 function updateEditLockButton() {
     const button = document.getElementById("editLockButton");
-    button.hidden = isSharedView;
-    button.textContent = editingUnlocked ? "Lock editing" : "Unlock editing";
-    button.setAttribute("aria-pressed", String(editingUnlocked));
-    button.classList.toggle("button-primary", editingUnlocked);
-    button.classList.toggle("button-quiet", !editingUnlocked);
+    const hasEditAccess = sharedBackendConfigured ? authenticatedAdmin : editingUnlocked;
+    button.textContent = sharedBackendConfigured
+        ? (authenticatedAdmin ? "Sign out" : "Admin sign in")
+        : (editingUnlocked ? "Lock editing" : "Unlock editing");
+    button.setAttribute("aria-pressed", String(hasEditAccess));
+    button.classList.toggle("button-primary", hasEditAccess);
+    button.classList.toggle("button-quiet", !hasEditAccess);
     const resetButton = document.getElementById("resetButton");
-    resetButton.disabled = !editingUnlocked || isSharedView;
-    resetButton.title = editingUnlocked
+    resetButton.disabled = sharedBackendConfigured
+        ? !authenticatedAdmin || !sharedBackendReady
+        : !editingUnlocked;
+    resetButton.title = hasEditAccess
         ? "Reset this fund's saved records"
-        : "Unlock editing to enable record resets";
-    document.getElementById("resetAccessNote").hidden = editingUnlocked;
+        : "Sign in as an admin to enable record resets";
+    const resetAccessNote = document.getElementById("resetAccessNote");
+    resetAccessNote.textContent = sharedBackendConfigured
+        ? "Sign in with an authorized admin account to reset records."
+        : "Unlock editing with the PIN to reset records.";
+    resetAccessNote.hidden = hasEditAccess;
+    document.getElementById("importLocalButton").hidden =
+        !sharedBackendConfigured || !sharedBackendReady || !authenticatedAdmin || !localImportAvailable;
 }
 
 function requestEditAccess(action) {
-    if (isSharedView) {
-        document.getElementById("shareNotice").textContent =
-            "This is a read-only snapshot. Open the regular fund link to edit records.";
-        return false;
-    }
-
-    if (editingUnlocked) {
+    if (sharedBackendConfigured) {
+        if (!sharedBackendReady || sharedBackendError) {
+            document.getElementById("syncNotice").textContent =
+                "The shared database is unavailable. Changes are disabled to avoid saving only on this device.";
+            document.getElementById("syncNotice").hidden = false;
+            return false;
+        }
+        if (authenticatedAdmin) {
+            return true;
+        }
+    } else if (editingUnlocked) {
         return true;
     }
 
     pendingEditAction = action || null;
     document.getElementById("pinMessage").textContent = "";
     document.getElementById("editPin").value = "";
+    document.getElementById("adminEmail").value = "";
+    document.getElementById("adminPassword").value = "";
+    document.getElementById("localPinField").hidden = sharedBackendConfigured;
+    document.getElementById("adminEmailField").hidden = !sharedBackendConfigured;
+    document.getElementById("adminPasswordField").hidden = !sharedBackendConfigured;
+    document.getElementById("editPin").required = !sharedBackendConfigured;
+    document.getElementById("adminEmail").required = sharedBackendConfigured;
+    document.getElementById("adminPassword").required = sharedBackendConfigured;
+    document.getElementById("editAccessIntro").textContent = sharedBackendConfigured
+        ? "Sign in with the fund administrator account to edit shared records."
+        : "Enter the local PIN to record collections, add expenses, or reset records.";
+    document.getElementById("pinTitle").textContent =
+        sharedBackendConfigured ? "Admin sign in" : "Unlock editing";
+    document.getElementById("editAccessDisclaimer").textContent = sharedBackendConfigured
+        ? "Only an administrator authorized in the shared database can change records."
+        : "This 4-digit PIN is a convenience lock only. It can be bypassed and is not secure authentication.";
+    document.getElementById("editAccessSubmit").textContent = sharedBackendConfigured ? "Sign in" : "Unlock";
     pinModal.hidden = false;
     document.body.classList.add("modal-open");
-    document.getElementById("editPin").focus();
+    document.getElementById(sharedBackendConfigured ? "adminEmail" : "editPin").focus();
     return false;
 }
 
@@ -183,6 +184,43 @@ function closePinModal() {
 
 async function submitPin(event) {
     event.preventDefault();
+    if (sharedBackendConfigured) {
+        const message = document.getElementById("pinMessage");
+        try {
+            const { data, error } = await supabaseClient.auth.signInWithPassword({
+                email: document.getElementById("adminEmail").value.trim(),
+                password: document.getElementById("adminPassword").value
+            });
+            if (error) {
+                throw error;
+            }
+            const { data: adminRecord, error: adminError } = await supabaseClient
+                .from("fund_admins")
+                .select("user_id")
+                .eq("user_id", data.user.id)
+                .maybeSingle();
+            if (adminError) {
+                throw adminError;
+            }
+            if (!adminRecord) {
+                await supabaseClient.auth.signOut();
+                throw new Error("This account is not authorized to edit fund records.");
+            }
+            authenticatedAdmin = true;
+            const action = pendingEditAction;
+            pendingEditAction = null;
+            updateEditLockButton();
+            closePinModal();
+            if (action) {
+                action();
+            }
+        } catch (error) {
+            console.error("Could not sign in to the shared fund.", error);
+            message.textContent = error.message || "Sign-in failed. Check your credentials and try again.";
+        }
+        return;
+    }
+
     const input = document.getElementById("editPin");
     let submittedPinDigest;
     try {
@@ -212,6 +250,44 @@ async function submitPin(event) {
     }
 }
 
+function openActivitiesPin() {
+    document.getElementById("activitiesPinMessage").textContent = "";
+    document.getElementById("activitiesPin").value = "";
+    activitiesPinModal.hidden = false;
+    document.body.classList.add("modal-open");
+    document.getElementById("activitiesPin").focus();
+}
+
+function closeActivitiesPin() {
+    activitiesPinModal.hidden = true;
+    document.body.classList.remove("modal-open");
+}
+
+async function submitActivitiesPin(event) {
+    event.preventDefault();
+    const input = document.getElementById("activitiesPin");
+    const message = document.getElementById("activitiesPinMessage");
+    try {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input.value));
+        const submittedDigest = Array.from(new Uint8Array(digest), byte =>
+            byte.toString(16).padStart(2, "0")).join("");
+        if (submittedDigest !== activitiesPinDigest) {
+            message.textContent = "Incorrect PIN. Try again.";
+            input.select();
+            return;
+        }
+
+        sessionStorage.setItem(activitiesAccessStorageKey, "granted");
+        const url = new URL(window.location.href);
+        url.searchParams.set("fund", "activities");
+        url.hash = "";
+        window.location.assign(url.href);
+    } catch (error) {
+        console.error("Could not verify the activities fund PIN.", error);
+        message.textContent = "Could not verify the PIN in this browser. Try a current browser over HTTPS.";
+    }
+}
+
 function createEmptyContributions() {
     return members.map(() => [false, false, false, false]);
 }
@@ -223,11 +299,75 @@ function normalizeContributions(data) {
     });
 }
 
-function loadMonthlyData() {
-    if (sharedSnapshot) {
-        return sharedSnapshot.monthlyContributions;
+function validateExpenses(expenseList) {
+    return Array.isArray(expenseList) && expenseList.every(expense => {
+        if (!expense || typeof expense.eventName !== "string" || !expense.eventName.trim() ||
+            !/^\d{4}-(0[1-9]|1[0-2])$/.test(expense.month) ||
+            !Number.isSafeInteger(expense.costCents) || expense.costCents <= 0 ||
+            !Array.isArray(expense.shares) || expense.shares.length === 0 ||
+            expense.shares.some(share =>
+                !Number.isInteger(share.memberIndex) || share.memberIndex < 0 ||
+                share.memberIndex >= members.length ||
+                !Number.isSafeInteger(share.amountCents) || share.amountCents < 0) ||
+            (expense.date && Number.isNaN(Date.parse(expense.date)))) {
+            return false;
+        }
+        const memberIndexes = expense.shares.map(share => share.memberIndex);
+        return new Set(memberIndexes).size === memberIndexes.length &&
+            expense.shares.reduce((total, share) => total + share.amountCents, 0) === expense.costCents;
+    });
+}
+
+function captureFundData() {
+    return JSON.parse(JSON.stringify({ monthlyContributions, receipts, expenses }));
+}
+
+function applyFundData(data) {
+    if (!data || !data.monthlyContributions || Array.isArray(data.monthlyContributions) ||
+        typeof data.monthlyContributions !== "object" || !Array.isArray(data.receipts) ||
+        !Array.isArray(data.expenses) || !validateExpenses(data.expenses)) {
+        throw new TypeError("The shared fund record has an invalid format.");
     }
 
+    const normalizedMonthlyData = {};
+    Object.entries(data.monthlyContributions).forEach(([month, monthData]) => {
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !Array.isArray(monthData)) {
+            throw new TypeError("The shared fund record contains invalid monthly contributions.");
+        }
+        normalizedMonthlyData[month] = normalizeContributions(monthData);
+    });
+    const validReceipts = data.receipts.every(receipt =>
+        receipt && typeof receipt.id === "string" &&
+        Number.isInteger(receipt.memberIndex) && receipt.memberIndex >= 0 &&
+        receipt.memberIndex < members.length &&
+        typeof receipt.memberName === "string" &&
+        /^\d{4}-(0[1-9]|1[0-2])$/.test(receipt.month) &&
+        typeof receipt.date === "string" && !Number.isNaN(Date.parse(receipt.date)) &&
+        Number.isFinite(receipt.amount) && receipt.amount >= 0 &&
+        (!receipt.weeks || (Array.isArray(receipt.weeks) &&
+            receipt.weeks.every(week => Number.isInteger(week) && week >= 1 && week <= 4))));
+    if (!validReceipts) {
+        throw new TypeError("The shared fund record contains invalid receipts.");
+    }
+
+    monthlyContributions = normalizedMonthlyData;
+    contributions = monthlyContributions[activeMonth] || createEmptyContributions();
+    monthlyContributions[activeMonth] = contributions;
+    receipts = data.receipts;
+    expenses = data.expenses;
+    renderFundData();
+}
+
+function renderFundData() {
+    renderMembers();
+    renderSummaryTable();
+    updateSummary();
+    renderBirthdays();
+    renderRecentCollections();
+    renderTransactions();
+}
+
+function loadMonthlyData() {
     const storedMonthlyData = localStorage.getItem(monthlyStorageKey);
     if (storedMonthlyData) {
         try {
@@ -271,10 +411,6 @@ function loadMonthlyData() {
 }
 
 function loadReceipts() {
-    if (sharedSnapshot) {
-        return sharedSnapshot.receipts;
-    }
-
     const storedReceipts = localStorage.getItem(receiptsStorageKey);
     if (!storedReceipts) {
         return [];
@@ -295,32 +431,14 @@ function loadReceipts() {
 }
 
 function loadExpenses() {
-    const storedExpenses = sharedSnapshot
-        ? JSON.stringify(sharedSnapshot.expenses)
-        : localStorage.getItem(expensesStorageKey);
+    const storedExpenses = localStorage.getItem(expensesStorageKey);
     if (!storedExpenses) {
         return [];
     }
 
     try {
         const parsedExpenses = JSON.parse(storedExpenses);
-        const validExpenses = Array.isArray(parsedExpenses) && parsedExpenses.every(expense => {
-            if (!expense || typeof expense.eventName !== "string" || !expense.eventName.trim() ||
-                !/^\d{4}-(0[1-9]|1[0-2])$/.test(expense.month) ||
-                !Number.isSafeInteger(expense.costCents) || expense.costCents <= 0 ||
-                !Array.isArray(expense.shares) || expense.shares.length === 0 ||
-                expense.shares.some(share =>
-                    !Number.isInteger(share.memberIndex) || share.memberIndex < 0 ||
-                    share.memberIndex >= members.length ||
-                    !Number.isSafeInteger(share.amountCents) || share.amountCents < 0) ||
-                (expense.date && Number.isNaN(Date.parse(expense.date)))) {
-                return false;
-            }
-            const memberIndexes = expense.shares.map(share => share.memberIndex);
-            return new Set(memberIndexes).size === memberIndexes.length &&
-                expense.shares.reduce((total, share) => total + share.amountCents, 0) === expense.costCents;
-        });
-        if (validExpenses) {
+        if (validateExpenses(parsedExpenses)) {
             return parsedExpenses;
         }
         throw new TypeError("Saved expenses contain invalid records.");
@@ -332,11 +450,213 @@ function loadExpenses() {
     }
 }
 
-function saveData() {
+function setSyncStatus(message, isError = false) {
+    const notice = document.getElementById("syncNotice");
+    notice.hidden = false;
+    notice.textContent = message;
+    notice.classList.toggle("storage-warning", isError);
+}
+
+function saveLocalFundCache() {
+    try {
+        localStorage.setItem(monthlyStorageKey, JSON.stringify(monthlyContributions));
+        localStorage.removeItem(storageKey);
+        localStorage.setItem(receiptsStorageKey, JSON.stringify(receipts));
+        localStorage.setItem(expensesStorageKey, JSON.stringify(expenses));
+        return true;
+    } catch (error) {
+        console.error("Could not update the local fund cache.", error);
+        return false;
+    }
+}
+
+async function saveSharedState() {
+    if (!sharedBackendReady || !authenticatedAdmin || !supabaseClient) {
+        throw new Error("Sign in as a fund administrator before saving shared records.");
+    }
+
+    setSyncStatus("Saving shared fund records…");
+    const { data, error } = await supabaseClient
+        .from("fund_ledgers")
+        .update({
+            data: { monthlyContributions, receipts, expenses },
+            revision: sharedRevision + 1,
+            updated_at: new Date().toISOString()
+        })
+        .eq("fund_id", storagePrefix)
+        .eq("revision", sharedRevision)
+        .select("revision")
+        .maybeSingle();
+    if (error) {
+        throw error;
+    }
+    if (!data) {
+        throw new Error("The shared ledger changed in another session. Reload the page before trying again.");
+    }
+
+    sharedRevision = data.revision;
+    const localBackupSaved = saveLocalFundCache();
+    storageStatus.textContent = "Changes are saved to the shared fund for everyone.";
+    setSyncStatus(localBackupSaved
+        ? "Shared fund records saved. Everyone visiting this fund can see the latest data."
+        : "Shared records were saved, but this browser’s local backup could not be updated.", !localBackupSaved);
+}
+
+async function checkAdminAccess(userId) {
+    if (!userId) {
+        return false;
+    }
+
+    const { data, error } = await supabaseClient
+        .from("fund_admins")
+        .select("user_id")
+        .eq("user_id", userId)
+        .maybeSingle();
+    if (error) {
+        throw error;
+    }
+    return Boolean(data);
+}
+
+async function loadSharedLedger() {
+    const { data, error } = await supabaseClient
+        .from("fund_ledgers")
+        .select("data, revision, updated_at")
+        .eq("fund_id", storagePrefix)
+        .single();
+    if (error) {
+        throw error;
+    }
+
+    applyFundData(data.data);
+    sharedRevision = data.revision;
+    return data;
+}
+
+function isEmptyFundData(data) {
+    const hasContributions = Object.values(data.monthlyContributions)
+        .some(monthData => monthData.some(memberWeeks => memberWeeks.some(Boolean)));
+    return !hasContributions && data.receipts.length === 0 && data.expenses.length === 0;
+}
+
+function subscribeToSharedLedger() {
+    supabaseClient
+        .channel(`fund-ledger-${storagePrefix}`)
+        .on("postgres_changes", {
+            event: "UPDATE",
+            schema: "public",
+            table: "fund_ledgers",
+            filter: `fund_id=eq.${storagePrefix}`
+        }, payload => {
+            if (!payload.new || payload.new.revision <= sharedRevision) {
+                return;
+            }
+            try {
+                applyFundData(payload.new.data);
+                sharedRevision = payload.new.revision;
+                setSyncStatus("The shared ledger was updated in another session.");
+            } catch (error) {
+                console.error("Could not apply a shared ledger update.", error);
+                setSyncStatus(`A shared update could not be displayed: ${error.message}`, true);
+            }
+        })
+        .subscribe(status => {
+            if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+                setSyncStatus("Live updates are unavailable. Reload the page to check for newer records.", true);
+            }
+        });
+}
+
+async function initializeSharedBackend() {
+    if (!hasSelectedFund) {
+        return;
+    }
+
+    localImportData = captureFundData();
+    const mastheadStatus = document.querySelector(".masthead-status");
+    const localBadge = document.querySelector(".local-badge");
+    if (!sharedBackendConfigured) {
+        mastheadStatus.textContent = "Saved locally";
+        localBadge.textContent = "Local records";
+        setSyncStatus("Shared storage is not configured. These records are only saved in this browser.", true);
+        return;
+    }
+
+    mastheadStatus.textContent = "Connecting to shared fund";
+    localBadge.textContent = "Loading shared records";
+    setSyncStatus("Loading the shared fund…");
+    try {
+        if (!supabaseClient) {
+            throw new Error(sharedBackendError || "The shared database client is unavailable.");
+        }
+        const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
+        if (sessionError) {
+            throw sessionError;
+        }
+        authenticatedAdmin = await checkAdminAccess(sessionData.session && sessionData.session.user.id);
+        const ledger = await loadSharedLedger();
+        sharedBackendReady = true;
+        localImportAvailable = isEmptyFundData(ledger.data) && !isEmptyFundData(localImportData);
+        mastheadStatus.textContent = authenticatedAdmin ? "Admin connected" : "Shared fund";
+        localBadge.textContent = "Live shared records";
+        storageStatus.textContent = "Records are loaded from the shared fund.";
+        updateEditLockButton();
+        setSyncStatus(isActivitiesFund
+            ? "The External Activities Fund is public: anyone visiting this site can view its records."
+            : "Showing the shared community fund. Anyone visiting this fund can view its records.");
+        subscribeToSharedLedger();
+    } catch (error) {
+        sharedBackendError = error.message || "The shared database could not be reached.";
+        sharedBackendReady = false;
+        authenticatedAdmin = false;
+        mastheadStatus.textContent = "Shared fund unavailable";
+        localBadge.textContent = "Local records only";
+        storageStatus.textContent = "The shared fund could not be loaded; this browser’s local records are shown.";
+        console.error("Could not load the shared fund.", error);
+        setSyncStatus(`Could not load shared records: ${sharedBackendError}. Showing this browser’s local data only.`, true);
+        updateEditLockButton();
+    }
+}
+
+async function importLocalRecords() {
+    if (!authenticatedAdmin || !localImportAvailable || !localImportData) {
+        return;
+    }
+    if (!window.confirm("Import this browser’s records into the shared fund? This only works while the shared fund is empty.")) {
+        return;
+    }
+
+    const previousData = captureFundData();
+    try {
+        applyFundData(localImportData);
+        await saveSharedState();
+        localImportAvailable = false;
+        updateEditLockButton();
+        setSyncStatus("This browser’s records were imported into the shared fund.");
+    } catch (error) {
+        console.error("Could not import this browser’s records.", error);
+        applyFundData(previousData);
+        setSyncStatus(`Could not import local records: ${error.message}`, true);
+    }
+}
+
+async function saveData() {
     const previousMonthData = monthlyContributions[activeMonth];
     monthlyContributions[activeMonth] = contributions;
-    if (isSharedView) {
-        return true;
+    if (sharedBackendConfigured) {
+        try {
+            await saveSharedState();
+            return true;
+        } catch (error) {
+            if (previousMonthData === undefined) {
+                delete monthlyContributions[activeMonth];
+            } else {
+                monthlyContributions[activeMonth] = previousMonthData;
+            }
+            console.error("Could not save shared fund contributions.", error);
+            setSyncStatus(`Could not save shared contributions: ${error.message}`, true);
+            return false;
+        }
     }
 
     try {
@@ -357,7 +677,18 @@ function saveData() {
     }
 }
 
-function saveReceipts() {
+async function saveReceipts() {
+    if (sharedBackendConfigured) {
+        try {
+            await saveSharedState();
+            return true;
+        } catch (error) {
+            console.error("Could not save shared receipt history.", error);
+            setSyncStatus(`Could not save the receipt to the shared fund: ${error.message}`, true);
+            return false;
+        }
+    }
+
     try {
         localStorage.setItem(receiptsStorageKey, JSON.stringify(receipts));
         return true;
@@ -367,7 +698,23 @@ function saveReceipts() {
     }
 }
 
-function saveExpenses(nextExpenses) {
+async function saveExpenses(nextExpenses) {
+    if (sharedBackendConfigured) {
+        const previousExpenses = expenses;
+        expenses = nextExpenses;
+        try {
+            await saveSharedState();
+            return true;
+        } catch (error) {
+            expenses = previousExpenses;
+            console.error("Could not save shared expenses.", error);
+            document.getElementById("expenseMessage").textContent =
+                `Could not save this expense to the shared fund: ${error.message}`;
+            setSyncStatus("The expense was not saved to the shared fund.", true);
+            return false;
+        }
+    }
+
     try {
         localStorage.setItem(expensesStorageKey, JSON.stringify(nextExpenses));
         return true;
@@ -376,61 +723,6 @@ function saveExpenses(nextExpenses) {
         document.getElementById("expenseMessage").textContent =
             "Could not save this expense in the browser. Check available storage and try again.";
         return false;
-    }
-}
-
-function copyTextToClipboard(text) {
-    if (navigator.clipboard && window.isSecureContext) {
-        return navigator.clipboard.writeText(text);
-    }
-
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    textArea.setAttribute("readonly", "");
-    textArea.style.position = "fixed";
-    textArea.style.opacity = "0";
-    document.body.appendChild(textArea);
-    textArea.select();
-    const copied = document.execCommand("copy");
-    textArea.remove();
-    if (!copied) {
-        throw new Error("The browser could not copy the share link.");
-    }
-    return Promise.resolve();
-}
-
-async function copyShareLink() {
-    const notice = document.getElementById("shareNotice");
-    notice.hidden = false;
-    try {
-        const snapshot = {
-            version: 1,
-            fund: isActivitiesFund ? "activities" : "community",
-            activeMonth,
-            monthlyContributions,
-            receipts,
-            expenses
-        };
-        const bytes = new TextEncoder().encode(JSON.stringify(snapshot));
-        let binaryData = "";
-        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-            binaryData += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-        }
-        const encodedData = btoa(binaryData).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-        const url = new URL(window.location.href);
-        url.searchParams.set("fund", isActivitiesFund ? "activities" : "community");
-        url.hash = `share=${encodedData}`;
-        if (url.href.length > 500000) {
-            throw new RangeError("The saved data is too large to fit in a share link.");
-        }
-        await copyTextToClipboard(url.href);
-        notice.textContent =
-            "Share link copied. It contains a read-only snapshot; anyone with the link can view these records.";
-    } catch (error) {
-        console.error("Could not create or copy the share link.", error);
-        notice.textContent = error instanceof RangeError
-            ? "These records are too large to fit in a share link. Export the report instead."
-            : "Could not copy the share link. Check clipboard permission and try again.";
     }
 }
 
@@ -516,8 +808,8 @@ function createMemberRow(member, index) {
     const historyButton = document.createElement("button");
     historyButton.type = "button";
     historyButton.className = "history-button";
-    historyButton.textContent = "History";
-    historyButton.setAttribute("aria-label", `View transactions for ${member.name}`);
+    historyButton.textContent = "Receipts";
+    historyButton.setAttribute("aria-label", `View and print receipts for ${member.name}`);
     actionCell.append(collectButton, additionalCollectionButton, historyButton);
     row.appendChild(actionCell);
     return row;
@@ -628,8 +920,8 @@ function createMemberCard(member, index) {
     const historyButton = document.createElement("button");
     historyButton.type = "button";
     historyButton.className = "history-button";
-    historyButton.textContent = "Transactions";
-    historyButton.setAttribute("aria-label", `View transactions for ${member.name}`);
+    historyButton.textContent = "My receipts";
+    historyButton.setAttribute("aria-label", `View and print receipts for ${member.name}`);
     const collectionActions = document.createElement("div");
     collectionActions.className = "member-card-collection-actions";
     collectionActions.append(collectButton, additionalCollectionButton);
@@ -903,7 +1195,8 @@ function renderTransactions() {
             memberIndex,
             type: "Collection",
             details: collectionDetails,
-            amountCents
+            amountCents,
+            receipt
         });
     });
 
@@ -944,7 +1237,7 @@ function renderTransactions() {
     if (visibleTransactions.length === 0) {
         const emptyRow = document.createElement("tr");
         const emptyCell = document.createElement("td");
-        emptyCell.colSpan = 5;
+        emptyCell.colSpan = 6;
         emptyCell.className = "empty-transaction-cell";
         emptyCell.textContent = "No transactions recorded for this month and selection.";
         emptyRow.appendChild(emptyCell);
@@ -968,7 +1261,19 @@ function renderTransactions() {
         amountCell.className = `money-cell transaction-amount${transaction.amountCents < 0 ? " transaction-expense" : ""}`;
         const sign = transaction.amountCents < 0 ? "−" : "+";
         amountCell.textContent = `${sign}Rs. ${formatCurrency(Math.abs(transaction.amountCents) / 100)}`;
-        row.append(dateCell, memberCell, typeCell, detailsCell, amountCell);
+        const receiptCell = document.createElement("td");
+        if (transaction.receipt) {
+            const receiptButton = document.createElement("button");
+            receiptButton.type = "button";
+            receiptButton.className = "text-button transaction-receipt-button";
+            receiptButton.textContent = "View / print";
+            receiptButton.setAttribute("aria-label", `View or print ${members[transaction.memberIndex].name}'s receipt`);
+            receiptButton.addEventListener("click", () => showReceipt(transaction.receipt));
+            receiptCell.appendChild(receiptButton);
+        } else {
+            receiptCell.textContent = "—";
+        }
+        row.append(dateCell, memberCell, typeCell, detailsCell, amountCell, receiptCell);
         table.appendChild(row);
     });
 }
@@ -1078,13 +1383,13 @@ function showView(viewName) {
     });
 }
 
-function selectMonth(monthKey) {
+async function selectMonth(monthKey) {
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey)) {
         monthSelector.value = activeMonth;
         return;
     }
 
-    if (!saveData()) {
+    if (!sharedBackendConfigured && !(await saveData())) {
         monthSelector.value = activeMonth;
         return;
     }
@@ -1096,14 +1401,12 @@ function selectMonth(monthKey) {
     document.getElementById("currentMonth").textContent = formatMonthName(activeMonth);
     document.getElementById("expenseMonth").textContent = formatMonthName(activeMonth);
     document.getElementById("resetMessage").textContent = "";
-    if (!isSharedView) {
-        try {
-            localStorage.setItem(activeMonthStorageKey, activeMonth);
-        } catch (error) {
-            console.error("Could not save the selected collection month.", error);
-            document.getElementById("resetMessage").textContent =
-                "The selected month could not be remembered after closing this page.";
-        }
+    try {
+        localStorage.setItem(activeMonthStorageKey, activeMonth);
+    } catch (error) {
+        console.error("Could not save the selected collection month.", error);
+        document.getElementById("resetMessage").textContent =
+            "The selected month could not be remembered after closing this page.";
     }
 
     renderMembers();
@@ -1157,7 +1460,7 @@ function restoreStorageValue(key, value) {
     }
 }
 
-function resetRecords() {
+async function resetRecords() {
     if (!requestEditAccess(resetRecords)) {
         return;
     }
@@ -1166,6 +1469,28 @@ function resetRecords() {
         "Reset all member contributions, expenses, and receipt history? This cannot be undone."
     );
     if (!confirmed) {
+        return;
+    }
+
+    if (sharedBackendConfigured) {
+        const previousState = captureFundData();
+        monthlyContributions = {};
+        contributions = createEmptyContributions();
+        monthlyContributions[activeMonth] = contributions;
+        receipts = [];
+        expenses = [];
+        try {
+            await saveSharedState();
+        } catch (error) {
+            console.error("Could not reset the shared records.", error);
+            applyFundData(previousState);
+            document.getElementById("resetMessage").textContent =
+                `Reset failed. Shared records were kept: ${error.message}`;
+            return;
+        }
+        renderFundData();
+        document.getElementById("resetMessage").textContent =
+            "All monthly contributions, expenses, and saved receipts have been reset.";
         return;
     }
 
@@ -1215,15 +1540,15 @@ function resetRecords() {
         "All monthly contributions, expenses, and saved receipts have been reset.";
 }
 
-function saveExpense(event) {
+async function saveExpense(event) {
     event.preventDefault();
     if (!requestEditAccess(saveExpenseAfterUnlock)) {
         return;
     }
-    saveExpenseAfterUnlock();
+    await saveExpenseAfterUnlock();
 }
 
-function saveExpenseAfterUnlock() {
+async function saveExpenseAfterUnlock() {
     const form = document.getElementById("expenseForm");
     const eventName = document.getElementById("expenseEventName").value.trim();
     const costCents = getExpenseCostCents();
@@ -1258,7 +1583,7 @@ function saveExpenseAfterUnlock() {
         shares
     };
     const updatedExpenses = [expense, ...expenses];
-    if (!saveExpenses(updatedExpenses)) {
+    if (!await saveExpenses(updatedExpenses)) {
         return;
     }
 
@@ -1391,7 +1716,7 @@ function createReceiptId() {
     return `BK-${dateStamp}-${Date.now().toString(36).toUpperCase()}`;
 }
 
-function saveCollection() {
+async function saveCollection() {
     if (!requestEditAccess(saveCollection)) {
         return;
     }
@@ -1425,11 +1750,13 @@ function saveCollection() {
             date: new Date().toISOString()
         };
         receipts.unshift(receipt);
-        receiptSaved = saveReceipts();
+        receiptSaved = await saveReceipts();
         if (!receiptSaved) {
             receipts.shift();
             document.getElementById("collectionMessage").textContent =
-                "Could not save this additional collection in the browser. Check available storage and try again.";
+                sharedBackendConfigured
+                    ? "Could not save this additional collection to the shared fund. Check the status message and try again."
+                    : "Could not save this additional collection in the browser. Check available storage and try again.";
             return;
         }
     } else {
@@ -1450,7 +1777,7 @@ function saveCollection() {
                 : memberWeeks
         );
 
-        if (!saveData()) {
+        if (!await saveData()) {
             contributions = previousContributions;
             return;
         }
@@ -1466,7 +1793,7 @@ function saveCollection() {
             date: new Date().toISOString()
         };
         receipts.unshift(receipt);
-        receiptSaved = saveReceipts();
+        receiptSaved = await saveReceipts();
     }
 
     renderMembers();
@@ -1608,7 +1935,7 @@ async function downloadReceiptImage() {
         context.font = "700 36px 'DM Sans', sans-serif";
         context.fillText("Payment receipt", 115, 285);
         context.fillStyle = "#4e8a64";
-        context.font = "700 19px 'DM Sans', sans-serif";
+        context.font = "700 23px 'DM Sans', sans-serif";
         context.fillText("PAID", 990, 279);
 
         const details = [
@@ -1669,8 +1996,8 @@ async function downloadReceiptImage() {
     }
 }
 
-document.getElementById("fundPicker").hidden = hasSelectedFund;
-document.getElementById("appShell").hidden = !hasSelectedFund;
+document.getElementById("fundPicker").hidden = shouldOpenFund;
+document.getElementById("appShell").hidden = !shouldOpenFund;
 if (hasSelectedFund) {
     const fundName = isActivitiesFund
         ? "External Activities Fund ( Highly Confidential )"
@@ -1700,13 +2027,50 @@ if (hasSelectedFund) {
 }
 
 document.getElementById("changeFundButton").addEventListener("click", () => {
+    sessionStorage.removeItem(activitiesAccessStorageKey);
     document.getElementById("appShell").hidden = true;
     document.getElementById("fundPicker").hidden = false;
     window.history.replaceState(null, "", window.location.pathname);
     document.getElementById("fundPickerTitle").focus();
 });
-document.getElementById("shareButton").addEventListener("click", copyShareLink);
-document.getElementById("editLockButton").addEventListener("click", () => {
+document.querySelector('[data-fund="activities"]').addEventListener("click", event => {
+    if (sessionStorage.getItem(activitiesAccessStorageKey) === "granted") {
+        return;
+    }
+    event.preventDefault();
+    openActivitiesPin();
+});
+document.getElementById("activitiesPinForm").addEventListener("submit", submitActivitiesPin);
+document.querySelectorAll("[data-close-activities-pin]").forEach(button => {
+    button.addEventListener("click", closeActivitiesPin);
+});
+activitiesPinModal.addEventListener("click", event => {
+    if (event.target === activitiesPinModal) {
+        closeActivitiesPin();
+    }
+});
+document.getElementById("editLockButton").addEventListener("click", async () => {
+    if (sharedBackendConfigured) {
+        if (!authenticatedAdmin) {
+            requestEditAccess();
+            return;
+        }
+        try {
+            const { error } = await supabaseClient.auth.signOut();
+            if (error) {
+                throw error;
+            }
+            authenticatedAdmin = false;
+            updateEditLockButton();
+            document.querySelector(".masthead-status").textContent = "Shared fund";
+            setSyncStatus("Signed out. The shared fund remains visible; sign in as an admin to edit it.");
+        } catch (error) {
+            console.error("Could not sign out of the shared fund.", error);
+            setSyncStatus(`Could not sign out: ${error.message}`, true);
+        }
+        return;
+    }
+
     if (editingUnlocked) {
         editingUnlocked = false;
         updateEditLockButton();
@@ -1714,6 +2078,7 @@ document.getElementById("editLockButton").addEventListener("click", () => {
     }
     requestEditAccess();
 });
+document.getElementById("importLocalButton").addEventListener("click", importLocalRecords);
 document.getElementById("pinForm").addEventListener("submit", submitPin);
 document.querySelectorAll("[data-close-pin]").forEach(button => {
     button.addEventListener("click", closePinModal);
@@ -1838,7 +2203,9 @@ document.getElementById("anotherCollectionButton").addEventListener("click", () 
 });
 document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
-        if (!pinModal.hidden) {
+        if (!activitiesPinModal.hidden) {
+            closeActivitiesPin();
+        } else if (!pinModal.hidden) {
             closePinModal();
         } else if (!receiptModal.hidden) {
             closeReceipt();
@@ -1860,20 +2227,24 @@ document.querySelectorAll("[data-open-view]").forEach(button => {
 document.getElementById("printButton").addEventListener("click", () => window.print());
 document.getElementById("exportButton").addEventListener("click", exportCsv);
 document.getElementById("resetButton").addEventListener("click", resetRecords);
-document.querySelector(".masthead-status").textContent = isSharedView ? "Shared snapshot" : "Saved locally";
-document.querySelector(".local-badge").textContent = isSharedView ? "Shared snapshot" : "Local records";
-if (isSharedView || sharedSnapshotError) {
-    const shareNotice = document.getElementById("shareNotice");
-    shareNotice.hidden = false;
-    shareNotice.textContent = sharedSnapshotError || "Viewing a read-only snapshot. Anyone with this link can see these records. Updates made after the link was created will not appear here.";
-}
-if (isSharedView) {
-    storageStatus.textContent = "Viewing a read-only snapshot. Changes are not saved.";
-}
 updateEditLockButton();
 
 const loadingScreen = document.getElementById("loadingScreen");
-window.setTimeout(() => {
+function hideLoadingScreen() {
     loadingScreen.classList.add("is-hidden");
     loadingScreen.setAttribute("aria-hidden", "true");
-}, 1800);
+}
+if (shouldOpenFund) {
+    initializeSharedBackend().then(hideLoadingScreen, error => {
+        console.error("Could not initialize the shared fund.", error);
+        setSyncStatus(`Could not initialize shared storage: ${error.message}`, true);
+        hideLoadingScreen();
+    });
+} else {
+    window.setTimeout(() => {
+        hideLoadingScreen();
+        if (isActivitiesFund) {
+            openActivitiesPin();
+        }
+    }, 1800);
+}

@@ -13,7 +13,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20261117-mobile-layout">
+    <link rel="stylesheet" href="style.css?v=20261118-member-receipts">
 </head>
 
 <body>
@@ -43,7 +43,7 @@
                 <span>Community fund · birthdays and shared activities</span>
                 <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
             </a>
-            <a class="fund-choice-card" href="?fund=activities">
+            <a class="fund-choice-card" href="?fund=activities" data-fund="activities">
                 <span class="fund-choice-kicker">BOYS’ ACTIVITIES</span>
                 <strong>External Activities Fund <span class="confidential-label">( Highly Confidential
                         )</span></strong>
@@ -51,9 +51,9 @@
                 <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
             </a>
         </div>
-        <p class="fund-picker-disclaimer">“Highly Confidential” is a label only. The 4-digit editing PIN is a
-            convenience lock, not secure authentication. Records stay in this browser unless you create a share link;
-            anyone with that link can view its read-only snapshot.</p>
+        <p class="fund-picker-disclaimer">“Highly Confidential” is a label only. The activities PIN is a convenience
+            gate, not security: anyone visiting this site can access the public records. Only signed-in admins can edit.
+        </p>
         <p class="picker-powered-by powered-by">Powered by <strong>DP Creations</strong></p>
     </main>
 
@@ -101,7 +101,8 @@
                         Unlock editing
                     </button>
                     <button class="button button-quiet" id="changeFundButton" type="button">Choose fund</button>
-                    <button class="button button-quiet" id="shareButton" type="button">Copy share link</button>
+                    <button class="button button-quiet" id="importLocalButton" type="button" hidden>Import this
+                        browser’s records</button>
                     <label class="month-picker-group" for="monthSelector">
                         <span>MONTH</span>
                         <input id="monthSelector" type="month" aria-label="Select collection month">
@@ -112,7 +113,7 @@
                     </button>
                 </div>
             </header>
-            <p class="share-notice" id="shareNotice" role="status" aria-live="polite" hidden></p>
+            <p class="sync-notice" id="syncNotice" role="status" aria-live="polite" hidden></p>
 
             <section class="view-panel" id="overviewView" aria-labelledby="welcomeTitle">
                 <div class="welcome-card">
@@ -429,6 +430,7 @@
                                     <th scope="col">TYPE</th>
                                     <th scope="col">DETAILS</th>
                                     <th scope="col">AMOUNT (RS.)</th>
+                                    <th scope="col">RECEIPT</th>
                                 </tr>
                             </thead>
                             <tbody id="transactionsTable"></tbody>
@@ -447,6 +449,31 @@
         </main>
     </div>
 
+    <div class="modal-backdrop" id="activitiesPinModal" hidden>
+        <section class="modal-dialog pin-dialog" role="dialog" aria-modal="true" aria-labelledby="activitiesPinTitle">
+            <div class="modal-heading">
+                <div>
+                    <p class="eyebrow">EXTERNAL ACTIVITIES FUND</p>
+                    <h2 id="activitiesPinTitle">Enter fund PIN</h2>
+                </div>
+                <button class="icon-button" type="button" data-close-activities-pin aria-label="Close">×</button>
+            </div>
+            <p class="modal-intro">Enter the 4-digit PIN to continue.</p>
+            <form id="activitiesPinForm">
+                <label class="form-field pin-field" for="activitiesPin">
+                    <span>PIN</span>
+                    <input id="activitiesPin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}"
+                        maxlength="4" autocomplete="off" required>
+                </label>
+                <p class="form-message" id="activitiesPinMessage" role="status" aria-live="polite"></p>
+                <div class="modal-actions">
+                    <button class="button button-quiet" type="button" data-close-activities-pin>Cancel</button>
+                    <button class="button button-primary" type="submit">Continue</button>
+                </div>
+            </form>
+        </section>
+    </div>
+
     <div class="modal-backdrop" id="pinModal" hidden>
         <section class="modal-dialog pin-dialog" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
             <div class="modal-heading">
@@ -456,19 +483,28 @@
                 </div>
                 <button class="icon-button" type="button" data-close-pin aria-label="Close">×</button>
             </div>
-            <p class="modal-intro">Enter the PIN to record collections, add expenses, or reset records.</p>
+            <p class="modal-intro" id="editAccessIntro">Enter the PIN to record collections, add expenses, or reset
+                records.</p>
             <form id="pinForm">
-                <label class="form-field pin-field" for="editPin">
+                <label class="form-field pin-field" id="localPinField" for="editPin">
                     <span>PIN</span>
                     <input id="editPin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4"
                         autocomplete="off" required>
                 </label>
+                <label class="form-field pin-field" id="adminEmailField" for="adminEmail" hidden>
+                    <span>Admin email</span>
+                    <input id="adminEmail" name="email" type="email" autocomplete="username">
+                </label>
+                <label class="form-field pin-field" id="adminPasswordField" for="adminPassword" hidden>
+                    <span>Password</span>
+                    <input id="adminPassword" name="password" type="password" autocomplete="current-password">
+                </label>
                 <p class="form-message" id="pinMessage" role="status" aria-live="polite"></p>
-                <p class="pin-disclaimer">This 4-digit PIN is a convenience lock only. It can be bypassed and is not
-                    secure authentication.</p>
+                <p class="pin-disclaimer" id="editAccessDisclaimer">This 4-digit PIN is a convenience lock only. It can
+                    be bypassed and is not secure authentication.</p>
                 <div class="modal-actions">
                     <button class="button button-quiet" type="button" data-close-pin>Cancel</button>
-                    <button class="button button-primary" type="submit">Unlock</button>
+                    <button class="button button-primary" id="editAccessSubmit" type="submit">Unlock</button>
                 </div>
             </form>
         </section>
@@ -575,7 +611,9 @@
         </section>
     </div>
 
-    <script src="script.js"></script>
+    <script src="supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js?v=20261118-member-receipts"></script>
 </body>
 
 </html>
