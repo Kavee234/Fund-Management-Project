@@ -23,6 +23,11 @@ body {
     font-family: "DM Sans", "Noto Sans Sinhala", sans-serif;
     font-size: 15px;
     -webkit-font-smoothing: antialiased;
+    transition: background-color .32s ease, color .32s ease;
+}
+
+html {
+    scroll-behavior: smooth;
 }
 
 button,
@@ -33,6 +38,30 @@ select {
 
 button {
     cursor: pointer;
+}
+
+button,
+a,
+input,
+select {
+    -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+input,
+select,
+.nav-link,
+.button,
+.fund-choice-card,
+.access-choice-button,
+.member-card,
+.stat-card,
+.panel,
+.modal-dialog {
+    transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+    transition-duration: .22s;
+    transition-timing-function: cubic-bezier(.22, 1, .36, 1);
 }
 
 .sinhala {
@@ -287,6 +316,22 @@ button {
 
 .view-panel[hidden] {
     display: none;
+}
+
+.view-panel:not([hidden]) {
+    animation: view-enter .38s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes view-enter {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 #editLockButton[hidden],
@@ -1600,6 +1645,7 @@ tbody tr:hover {
     padding: 22px;
     background: rgba(26, 43, 35, .48);
     backdrop-filter: blur(3px);
+    animation: modal-backdrop-enter .22s ease-out both;
 }
 
 .modal-backdrop[hidden] {
@@ -1614,6 +1660,60 @@ tbody tr:hover {
     border-radius: 15px;
     background: #fff;
     box-shadow: 0 24px 80px rgba(20, 42, 31, .2);
+    animation: modal-dialog-enter .34s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes modal-backdrop-enter {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes modal-dialog-enter {
+    from {
+        opacity: 0;
+        transform: translateY(14px) scale(.975);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.modal-backdrop.is-closing {
+    pointer-events: none;
+    animation: modal-backdrop-exit .18s ease-in both;
+}
+
+.modal-backdrop.is-closing .modal-dialog {
+    animation: modal-dialog-exit .18s ease-in both;
+}
+
+@keyframes modal-backdrop-exit {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes modal-dialog-exit {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(8px) scale(.985);
+    }
 }
 
 .modal-heading {
@@ -1834,14 +1934,19 @@ tbody tr:hover {
 }
 
 .receipt-stamp {
-    padding: 7px 11px;
-    border: 1px solid #b8d5bc;
-    border-radius: 5px;
-    color: #4a855d;
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 1.2px;
-    transform: rotate(-5deg);
+    min-width: 92px;
+    padding: 10px 13px 9px;
+    border: 2px solid #78a985;
+    border-radius: 8px;
+    background: #edf6ed;
+    box-shadow: 0 5px 14px rgba(74, 133, 93, .16);
+    color: #2f7045;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    line-height: 1;
+    text-align: center;
+    transform: rotate(-5deg) scale(1.04);
 }
 
 .transaction-receipt-button {
@@ -4931,6 +5036,7 @@ body.fund-read-only #importLocalButton {
     visibility: hidden;
     opacity: 0;
     pointer-events: none;
+    transition-delay: .08s;
 }
 
 .loading-screen-card {
@@ -5214,6 +5320,23 @@ body.fund-read-only #importLocalButton {
     margin: 0 auto;
     padding: 48px 0;
     text-align: center;
+    animation: screen-enter .48s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.app-shell:not([hidden]) {
+    animation: screen-enter .48s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes screen-enter {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .fund-picker-brand {
@@ -5464,6 +5587,21 @@ body.fund-read-only #importLocalButton {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+    }
 }
 
 .member-card-collection-actions .collect-button,

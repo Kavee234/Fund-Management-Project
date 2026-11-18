@@ -83,6 +83,20 @@ let collectionMode = "weekly";
 let pendingAccessFund = fundMode;
 let pendingAccessMode = accessMode;
 
+function closeModalSmooth(modal) {
+    if (!modal || modal.hidden || modal.classList.contains("is-closing")) {
+        return;
+    }
+    modal.classList.add("is-closing");
+    window.setTimeout(() => {
+        modal.hidden = true;
+        modal.classList.remove("is-closing");
+        if (!document.querySelector(".modal-backdrop:not([hidden]):not(.is-closing)")) {
+            document.body.classList.remove("modal-open");
+        }
+    }, 180);
+}
+
 function updateEditLockButton() {
     const button = document.getElementById("editLockButton");
     const hasEditAccess = sharedBackendConfigured && authenticatedAdmin;
@@ -152,8 +166,7 @@ function requestEditAccess(action) {
 }
 
 function closePinModal() {
-    pinModal.hidden = true;
-    document.body.classList.remove("modal-open");
+    closeModalSmooth(pinModal);
     pendingEditAction = null;
 }
 
@@ -206,8 +219,7 @@ function openActivitiesPin() {
 }
 
 function closeActivitiesPin() {
-    activitiesPinModal.hidden = true;
-    document.body.classList.remove("modal-open");
+    closeModalSmooth(activitiesPinModal);
 }
 
 async function submitActivitiesPin(event) {
@@ -1417,7 +1429,15 @@ function renderBirthdays() {
 
 function showView(viewName) {
     ["overview", "members", "summary", "transactions"].forEach(name => {
-        document.getElementById(`${name}View`).hidden = name !== viewName;
+        const panel = document.getElementById(`${name}View`);
+        if (name === viewName) {
+            panel.hidden = false;
+            panel.style.animation = "none";
+            void panel.offsetWidth;
+            panel.style.animation = "";
+        } else {
+            panel.hidden = true;
+        }
     });
 
     document.querySelectorAll(".nav-link").forEach(button => {
@@ -1658,8 +1678,7 @@ function updateCollectionAmount() {
 }
 
 function closeCollection() {
-    collectionModal.hidden = true;
-    document.body.classList.remove("modal-open");
+    closeModalSmooth(collectionModal);
     activeMemberIndex = null;
     collectionMode = "weekly";
 }
@@ -1819,8 +1838,8 @@ function showReceipt(receipt) {
 }
 
 function closeReceipt() {
-    receiptModal.hidden = true;
-    document.body.classList.remove("modal-open", "printing-receipt");
+    closeModalSmooth(receiptModal);
+    document.body.classList.remove("printing-receipt");
     activeReceipt = null;
 }
 
@@ -1922,9 +1941,22 @@ async function downloadReceiptImage() {
         context.fillStyle = "#203b35";
         context.font = "700 36px 'DM Sans', sans-serif";
         context.fillText("Payment receipt", 115, 285);
-        context.fillStyle = "#4e8a64";
-        context.font = "700 23px 'DM Sans', sans-serif";
-        context.fillText("PAID", 990, 279);
+        context.save();
+        context.translate(1028, 267);
+        context.rotate(-5 * Math.PI / 180);
+        context.fillStyle = "#edf6ed";
+        context.strokeStyle = "#78a985";
+        context.lineWidth = 4;
+        context.beginPath();
+        context.roundRect(-84, -34, 168, 68, 10);
+        context.fill();
+        context.stroke();
+        context.fillStyle = "#2f7045";
+        context.font = "800 34px 'DM Sans', sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText("PAID", 0, 2);
+        context.restore();
 
         const details = [
             ["Receipt number", activeReceipt.id],
@@ -2032,16 +2064,14 @@ document.querySelectorAll("[data-select-fund]").forEach(button => {
 });
 document.querySelectorAll("[data-close-access-choice]").forEach(button => {
     button.addEventListener("click", () => {
-        document.getElementById("accessChoiceModal").hidden = true;
-        document.body.classList.remove("modal-open");
+        closeModalSmooth(document.getElementById("accessChoiceModal"));
         pendingAccessFund = null;
         pendingAccessMode = null;
     });
 });
 document.getElementById("accessChoiceModal").addEventListener("click", event => {
     if (event.target === document.getElementById("accessChoiceModal")) {
-        document.getElementById("accessChoiceModal").hidden = true;
-        document.body.classList.remove("modal-open");
+        closeModalSmooth(document.getElementById("accessChoiceModal"));
         pendingAccessFund = null;
         pendingAccessMode = null;
     }
