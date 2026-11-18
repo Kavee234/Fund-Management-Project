@@ -35,26 +35,77 @@
         </div>
         <p class="eyebrow">WELCOME</p>
         <h1 id="fundPickerTitle" tabindex="-1">Choose a fund</h1>
-        <p class="fund-picker-copy">Select which community ledger you want to open.</p>
+        <p class="fund-picker-copy">Choose a ledger and how you want to enter.</p>
         <div class="fund-choice-grid">
-            <a class="fund-choice-card" href="?fund=community">
+            <button class="fund-choice-card" type="button" data-select-fund="community">
                 <span class="fund-choice-kicker sinhala">ප්‍රධාන අරමුදල</span>
                 <strong class="sinhala">බාහිර ක්‍රියාකාරකම් අරමුදල</strong>
                 <span>Community fund · birthdays and shared activities</span>
                 <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
-            </a>
-            <a class="fund-choice-card" href="?fund=activities" data-fund="activities">
+            </button>
+            <button class="fund-choice-card" type="button" data-select-fund="activities" data-fund="activities">
                 <span class="fund-choice-kicker">BOYS’ ACTIVITIES</span>
                 <strong>External Activities Fund <span class="confidential-label">( Highly Confidential
                         )</span></strong>
                 <span>Trips, parties, and other activities · Rs. 100 per member, per week</span>
                 <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
-            </a>
+            </button>
         </div>
-        <p class="fund-picker-disclaimer">Only approved sign-in accounts can view fund records. Administrators can edit;
-            the Activities PIN is an extra prompt, not account access.</p>
+        <p class="fund-picker-disclaimer">Members can choose their name and view their own records and receipts.
+            Administrators sign in to add collections, expenses, and edit records.</p>
         <p class="picker-powered-by powered-by">Powered by <strong>DP Creations</strong></p>
     </main>
+
+    <div class="modal-backdrop" id="accessChoiceModal" hidden>
+        <section class="modal-dialog pin-dialog" role="dialog" aria-modal="true" aria-labelledby="accessChoiceTitle">
+            <div class="modal-heading">
+                <div>
+                    <p class="eyebrow">FUND ACCESS</p>
+                    <h2 id="accessChoiceTitle">How do you want to enter?</h2>
+                </div>
+            </div>
+            <p class="modal-intro">Choose a read-only member view or sign in as an administrator.</p>
+            <div class="access-choice-actions">
+                <button class="access-choice-button member-choice" id="memberAccessButton" type="button">
+                    <strong>Member login</strong>
+                    <span>View my data and receipts without a password</span>
+                </button>
+                <button class="access-choice-button admin-choice" id="adminAccessButton" type="button">
+                    <strong>Admin login</strong>
+                    <span>Sign in to view and manage all records</span>
+                </button>
+            </div>
+            <div class="modal-actions">
+                <button class="button button-quiet" type="button" data-close-access-choice>Cancel</button>
+            </div>
+        </section>
+    </div>
+
+    <div class="modal-backdrop" id="memberLoginModal" hidden>
+        <section class="modal-dialog pin-dialog" role="dialog" aria-modal="true" aria-labelledby="memberLoginTitle">
+            <div class="modal-heading">
+                <div>
+                    <p class="eyebrow">MEMBER VIEW</p>
+                    <h2 id="memberLoginTitle">Choose your name</h2>
+                </div>
+                <button class="icon-button" type="button" data-close-member-login aria-label="Close">×</button>
+            </div>
+            <p class="modal-intro">You can view only the records and receipts belonging to the member you select.</p>
+            <form id="memberLoginForm">
+                <label class="form-field pin-field" for="memberSelector">
+                    <span>Member</span>
+                    <select id="memberSelector" required>
+                        <option value="">Select a member</option>
+                    </select>
+                </label>
+                <p class="form-message" id="memberLoginMessage" role="status" aria-live="polite"></p>
+                <div class="modal-actions">
+                    <button class="button button-quiet" type="button" data-close-member-login>Cancel</button>
+                    <button class="button button-primary" type="submit">View records</button>
+                </div>
+            </form>
+        </section>
+    </div>
 
     <div class="app-shell" id="appShell" hidden>
         <header class="site-masthead">

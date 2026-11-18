@@ -5,6 +5,7 @@ The site uses the existing GitHub Pages URL. Fund data is returned only to an au
 ## Secure the existing Supabase project
 
 1. In Supabase, open **SQL Editor** and run `supabase-privacy-migration.sql`. This removes anonymous ledger reads and installs the private, filtered read function.
+   This migration now also creates the public member-roster and member-only read functions used by **Member login**. Member access is read-only and can return only the selected member's contributions, expense share, and receipts.
 2. Run the local `supabase-private-roster.sql` file in the SQL Editor. It seeds the member directory without shipping names and birthdays in the public JavaScript bundle. This file is intentionally ignored by Git; do not publish it.
 3. Keep the existing administrator account in **Authentication → Users** and confirm that it is authorized in `public.fund_admins`. Admins can read and edit both ledgers.
 4. Create an Auth account for each community member. Map each account to exactly one community member using that member's zero-based index from the roster:

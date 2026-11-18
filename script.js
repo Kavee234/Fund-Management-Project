@@ -1,10 +1,14 @@
 const fundMode = new URLSearchParams(window.location.search).get("fund");
+const accessMode = new URLSearchParams(window.location.search).get("access");
 const hasSelectedFund = fundMode === "community" || fundMode === "activities";
 const isActivitiesFund = fundMode === "activities";
 const activitiesAccessStorageKey = "activitiesFundAccess";
 const hasActivitiesFundAccess = !isActivitiesFund ||
     sessionStorage.getItem(activitiesAccessStorageKey) === "granted";
-const shouldOpenFund = hasSelectedFund && hasActivitiesFundAccess;
+const memberIndexStorageKey = `${isActivitiesFund ? "activitiesFund" : "fund"}MemberIndex`;
+const memberAccessSelected = accessMode === "member";
+const adminAccessSelected = accessMode === "admin";
+const shouldOpenFund = hasSelectedFund && (memberAccessSelected || adminAccessSelected);
 let members = [];
 const receiptBrandName = isActivitiesFund
     ? "External Activities Fund"
@@ -74,13 +78,16 @@ let activeMemberIndex = null;
 let activeReceipt = null;
 let pendingEditAction = null;
 let collectionMode = "weekly";
+let pendingAccessFund = null;
 
 function updateEditLockButton() {
     const button = document.getElementById("editLockButton");
     const hasEditAccess = sharedBackendConfigured && authenticatedAdmin;
     document.body.classList.toggle("fund-read-only", !hasEditAccess);
-    button.textContent = sharedBackendConfigured
-        ? (authenticatedRole ? "Sign out" : "Sign in")
+    button.textContent = authenticatedRole === "member_viewer"
+        ? "Change member"
+        : sharedBackendConfigured
+        ? (authenticatedRole ? "Sign out" : "Admin login")
         : "Private storage unavailable";
     button.setAttribute("aria-pressed", String(hasEditAccess));
     button.classList.toggle("button-primary", hasEditAccess);
@@ -461,6 +468,25 @@ async function saveSharedState() {
 }
 
 async function fetchSharedLedger() {
+    if (memberAccessSelected) {
+        const memberIndex = Number(sessionStorage.getItem(memberIndexStorageKey));
+        if (!Number.isInteger(memberIndex) || memberIndex < 0) {
+            throw new Error("Choose a member before viewing this fund.");
+        }
+        const { data, error } = await supabaseClient.rpc("read_member_fund_ledger", {
+            p_fund_id: storagePrefix,
+            p_member_index: memberIndex
+        });
+        if (error) {
+            throw error;
+        }
+        if (!data || !Array.isArray(data.members) || !data.data ||
+            !Number.isSafeInteger(data.revision)) {
+            throw new TypeError("The member fund response has an invalid format.");
+        }
+        return data;
+    }
+
     const { data, error } = await supabaseClient.rpc("read_fund_ledger", {
         p_fund_id: storagePrefix
     });
@@ -476,8 +502,8 @@ async function fetchSharedLedger() {
 
 function activateSharedAccess(snapshot) {
     const validRoles = isActivitiesFund
-        ? ["admin", "activities_viewer"]
-        : ["admin", "community_member"];
+        ? ["admin", "activities_viewer", "member_viewer"]
+        : ["admin", "community_member", "member_viewer"];
     if (!validRoles.includes(snapshot.role) ||
         snapshot.members.some(member => !member || typeof member.name !== "string")) {
         throw new TypeError("This account is not authorized to view this fund.");
@@ -520,15 +546,82 @@ function activateSharedAccess(snapshot) {
     updateEditLockButton();
     setSyncStatus(authenticatedAdmin
         ? "Administrator access is active."
-        : (isActivitiesFund
-            ? "Activities Fund access is limited to its approved group."
-            : "Only your community records and receipts are shown."));
+        : (authenticatedRole === "member_viewer"
+            ? "Member view is active. This view is read-only."
+            : (isActivitiesFund
+                ? "Activities Fund access is limited to its approved group."
+                : "Only your community records and receipts are shown.")));
 }
 
 async function loadSharedLedger() {
     const snapshot = await fetchSharedLedger();
     activateSharedAccess(snapshot);
     return snapshot;
+}
+
+async function loadMemberRoster() {
+    if (!supabaseClient) {
+        throw new Error(sharedBackendError || "The shared database client is unavailable.");
+    }
+    const { data, error } = await supabaseClient.rpc("get_member_roster", {
+        p_fund_id: storagePrefix
+    });
+    if (error) {
+        throw error;
+    }
+    if (!Array.isArray(data)) {
+        throw new TypeError("The member roster response has an invalid format.");
+    }
+
+    const selector = document.getElementById("memberSelector");
+    selector.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select a member";
+    selector.appendChild(placeholder);
+    data.forEach(member => {
+        if (!member || !Number.isInteger(member.index) || typeof member.name !== "string") {
+            throw new TypeError("The member roster contains invalid members.");
+        }
+        const option = document.createElement("option");
+        option.value = String(member.index);
+        option.textContent = member.name;
+        selector.appendChild(option);
+    });
+}
+
+function openMemberLogin() {
+    document.getElementById("memberLoginMessage").textContent = "";
+    document.getElementById("memberLoginModal").hidden = false;
+    document.body.classList.add("modal-open");
+    document.getElementById("memberSelector").focus();
+}
+
+function closeMemberLogin() {
+    document.getElementById("memberLoginModal").hidden = true;
+    document.body.classList.remove("modal-open");
+}
+
+async function submitMemberLogin(event) {
+    event.preventDefault();
+    const memberIndex = Number(document.getElementById("memberSelector").value);
+    if (!Number.isInteger(memberIndex) || memberIndex < 0) {
+        document.getElementById("memberLoginMessage").textContent = "Choose your name to continue.";
+        return;
+    }
+
+    try {
+        sessionStorage.setItem(memberIndexStorageKey, String(memberIndex));
+        await loadSharedLedger();
+        subscribeToSharedLedger();
+        closeMemberLogin();
+        setSyncStatus("Member view is active. This view is read-only.");
+    } catch (error) {
+        sessionStorage.removeItem(memberIndexStorageKey);
+        console.error("Could not open member records.", error);
+        document.getElementById("memberLoginMessage").textContent =
+            "Could not load this member's records. Try again.";
+    }
 }
 
 function clearSharedView(clearLocalCache = true) {
@@ -606,6 +699,19 @@ async function initializeSharedBackend() {
         if (!supabaseClient) {
             throw new Error(sharedBackendError || "The shared database client is unavailable.");
         }
+        if (memberAccessSelected) {
+            await loadMemberRoster();
+            const savedMemberIndex = sessionStorage.getItem(memberIndexStorageKey);
+            if (savedMemberIndex !== null) {
+                await loadSharedLedger();
+                subscribeToSharedLedger();
+                hideLoadingScreen();
+                return;
+            }
+            hideLoadingScreen();
+            openMemberLogin();
+            return;
+        }
         const { data: sessionData, error: sessionError } = await supabaseClient.auth.getSession();
         if (sessionError) {
             throw sessionError;
@@ -631,9 +737,17 @@ async function initializeSharedBackend() {
         localBadge.textContent = "No records displayed";
         storageStatus.textContent = "No private records are displayed until access is verified.";
         console.error("Could not load the shared fund.", error);
-        setSyncStatus("Could not verify access. Confirm your account is approved, then try again.", true);
         updateEditLockButton();
-        requestEditAccess();
+        if (memberAccessSelected) {
+            hideLoadingScreen();
+            document.getElementById("memberLoginMessage").textContent =
+                "Member view is not available yet. The Supabase member-view migration must be applied.";
+            openMemberLogin();
+            setSyncStatus("Member view requires the latest Supabase setup.", true);
+        } else {
+            setSyncStatus("Could not verify access. Confirm your account is approved, then try again.", true);
+            requestEditAccess();
+        }
     }
 }
 
@@ -1964,28 +2078,61 @@ if (hasSelectedFund) {
 
 document.getElementById("changeFundButton").addEventListener("click", () => {
     sessionStorage.removeItem(activitiesAccessStorageKey);
+    sessionStorage.removeItem(`${isActivitiesFund ? "activitiesFund" : "fund"}MemberIndex`);
     document.getElementById("appShell").hidden = true;
     document.getElementById("fundPicker").hidden = false;
     window.history.replaceState(null, "", window.location.pathname);
     document.getElementById("fundPickerTitle").focus();
 });
-document.querySelector('[data-fund="activities"]').addEventListener("click", event => {
-    if (sessionStorage.getItem(activitiesAccessStorageKey) === "granted") {
-        return;
+document.querySelectorAll("[data-select-fund]").forEach(button => {
+    button.addEventListener("click", () => {
+        pendingAccessFund = button.dataset.selectFund;
+        document.getElementById("accessChoiceModal").hidden = false;
+        document.body.classList.add("modal-open");
+    });
+});
+document.querySelectorAll("[data-close-access-choice]").forEach(button => {
+    button.addEventListener("click", () => {
+        document.getElementById("accessChoiceModal").hidden = true;
+        document.body.classList.remove("modal-open");
+        pendingAccessFund = null;
+    });
+});
+document.getElementById("accessChoiceModal").addEventListener("click", event => {
+    if (event.target === document.getElementById("accessChoiceModal")) {
+        document.getElementById("accessChoiceModal").hidden = true;
+        document.body.classList.remove("modal-open");
+        pendingAccessFund = null;
     }
-    event.preventDefault();
-    openActivitiesPin();
 });
-document.getElementById("activitiesPinForm").addEventListener("submit", submitActivitiesPin);
-document.querySelectorAll("[data-close-activities-pin]").forEach(button => {
-    button.addEventListener("click", closeActivitiesPin);
+document.getElementById("memberAccessButton").addEventListener("click", () => {
+    if (!pendingAccessFund) return;
+    window.location.assign(`?fund=${pendingAccessFund}&access=member`);
 });
-activitiesPinModal.addEventListener("click", event => {
-    if (event.target === activitiesPinModal) {
-        closeActivitiesPin();
+document.getElementById("adminAccessButton").addEventListener("click", () => {
+    if (!pendingAccessFund) return;
+    window.location.assign(`?fund=${pendingAccessFund}&access=admin`);
+});
+document.getElementById("memberLoginForm").addEventListener("submit", submitMemberLogin);
+document.querySelectorAll("[data-close-member-login]").forEach(button => {
+    button.addEventListener("click", closeMemberLogin);
+});
+document.getElementById("memberLoginModal").addEventListener("click", event => {
+    if (event.target === document.getElementById("memberLoginModal")) {
+        closeMemberLogin();
     }
 });
 document.getElementById("editLockButton").addEventListener("click", async () => {
+    if (authenticatedRole === "member_viewer") {
+        try {
+            await loadMemberRoster();
+        } catch (error) {
+            setSyncStatus("Could not load the member list.", true);
+            return;
+        }
+        openMemberLogin();
+        return;
+    }
     if (sharedBackendConfigured) {
         if (!authenticatedRole) {
             requestEditAccess();
