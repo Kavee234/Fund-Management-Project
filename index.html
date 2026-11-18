@@ -51,9 +51,8 @@
                 <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
             </a>
         </div>
-        <p class="fund-picker-disclaimer">“Highly Confidential” is a label only. The activities PIN is a convenience
-            gate, not security: anyone visiting this site can access the public records. Only signed-in admins can edit.
-        </p>
+        <p class="fund-picker-disclaimer">Only approved sign-in accounts can view fund records. Administrators can edit;
+            the Activities PIN is an extra prompt, not account access.</p>
         <p class="picker-powered-by powered-by">Powered by <strong>DP Creations</strong></p>
     </main>
 
@@ -252,8 +251,7 @@
                         </select>
                     </div>
                     <div class="member-card-grid" id="membersGrid"></div>
-                    <div class="table-note"><span class="online-dot" aria-hidden="true"></span> Changes are saved
-                        automatically in this browser.</div>
+                    <div class="table-note">Sign in with an approved account to view private records.</div>
                 </div>
             </section>
 
@@ -478,19 +476,13 @@
         <section class="modal-dialog pin-dialog" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
             <div class="modal-heading">
                 <div>
-                    <p class="eyebrow">EDIT ACCESS</p>
-                    <h2 id="pinTitle">Unlock editing</h2>
+                    <p class="eyebrow">PRIVATE FUND ACCESS</p>
+                    <h2 id="pinTitle">Sign in to the private fund</h2>
                 </div>
                 <button class="icon-button" type="button" data-close-pin aria-label="Close">×</button>
             </div>
-            <p class="modal-intro" id="editAccessIntro">Enter the PIN to record collections, add expenses, or reset
-                records.</p>
+            <p class="modal-intro" id="editAccessIntro">Sign in with an approved account to view this private fund.</p>
             <form id="pinForm">
-                <label class="form-field pin-field" id="localPinField" for="editPin">
-                    <span>PIN</span>
-                    <input id="editPin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4"
-                        autocomplete="off" required>
-                </label>
                 <label class="form-field pin-field" id="adminEmailField" for="adminEmail" hidden>
                     <span>Admin email</span>
                     <input id="adminEmail" name="email" type="email" autocomplete="username">
@@ -500,11 +492,10 @@
                     <input id="adminPassword" name="password" type="password" autocomplete="current-password">
                 </label>
                 <p class="form-message" id="pinMessage" role="status" aria-live="polite"></p>
-                <p class="pin-disclaimer" id="editAccessDisclaimer">This 4-digit PIN is a convenience lock only. It can
-                    be bypassed and is not secure authentication.</p>
+                <p class="pin-disclaimer" id="editAccessDisclaimer">Fund access is checked by the database.</p>
                 <div class="modal-actions">
                     <button class="button button-quiet" type="button" data-close-pin>Cancel</button>
-                    <button class="button button-primary" id="editAccessSubmit" type="submit">Unlock</button>
+                    <button class="button button-primary" id="editAccessSubmit" type="submit">Sign in</button>
                 </div>
             </form>
         </section>

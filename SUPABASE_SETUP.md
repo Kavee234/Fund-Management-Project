@@ -1,39 +1,46 @@
-# Shared fund setup (GitHub Pages)
+# Private shared-fund setup
 
-The site remains at its existing URL. With Supabase configured, every visitor reads the current community or activities ledger from the same database. Visitors can view records; only explicitly authorized administrator accounts can edit them.
+The site uses the existing GitHub Pages URL. Fund data is returned only to an authenticated administrator or an account explicitly assigned to that fund. The browser uses only the Supabase publishable key; database row-level security is the access boundary.
 
-## Configure Supabase
+## Secure the existing Supabase project
 
-1. Create a Supabase project.
-2. In **Project Settings → API**, copy the project URL and the publishable (or legacy `anon`) key into `supabase-config.js`:
-
-   ```js
-   window.FUND_APP_CONFIG = {
-       url: "https://YOUR-PROJECT.supabase.co",
-       anonKey: "YOUR-PUBLISHABLE-KEY"
-   };
-   ```
-
-   These values are public in a browser app. **Never** put a service-role key or database password in this file.
-
-3. Open the Supabase SQL Editor and run all of `supabase-setup.sql`.
-4. In **Authentication → Users**, create the fund administrator account.
-5. In the SQL Editor, authorize that account, replacing the email:
+1. In Supabase, open **SQL Editor** and run `supabase-privacy-migration.sql`. This removes anonymous ledger reads and installs the private, filtered read function.
+2. Run the local `supabase-private-roster.sql` file in the SQL Editor. It seeds the member directory without shipping names and birthdays in the public JavaScript bundle. This file is intentionally ignored by Git; do not publish it.
+3. Keep the existing administrator account in **Authentication → Users** and confirm that it is authorized in `public.fund_admins`. Admins can read and edit both ledgers.
+4. Create an Auth account for each community member. Map each account to exactly one community member using that member's zero-based index from the roster:
 
    ```sql
-   insert into public.fund_admins (user_id)
-   select id from auth.users where email = 'admin@example.com'
-   on conflict (user_id) do nothing;
+   insert into public.fund_member_accounts (fund_id, member_index, user_id)
+   select 'fund', 0, id
+   from auth.users
+   where email = 'member@example.com'
+   on conflict (fund_id, member_index)
+   do update set user_id = excluded.user_id;
    ```
 
-6. Deploy `index.html`, `script.js`, `style.css`, `supabase-config.js`, and the logo to GitHub Pages. `supabase-setup.sql` is run in Supabase; it does not need to be served by GitHub Pages.
+   Replace the example email and index. Repeat for each community member. A community account sees only its own contributions, expense share, and receipts.
+5. Create Auth accounts for the separately approved Activities Fund viewers. Add only approved users:
 
-## Import existing browser records
+   ```sql
+   insert into public.fund_activities_viewers (user_id, member_index)
+   select id, 0
+   from auth.users
+   where email = 'approved-viewer@example.com'
+   on conflict (user_id)
+   do update set member_index = excluded.member_index;
+   ```
 
-Existing localStorage records are not automatically uploaded or discarded. From the browser that has the records, open the relevant fund at the normal site URL, sign in as the authorized administrator, and select **Import this browser’s records** when offered. The import button is only offered when the corresponding shared ledger is empty. Repeat for the other fund if it has separate local records.
+   Replace the email and zero-based Activities Fund member index. Approved viewers may see the Activities ledger; receipts remain limited to their own account and admins.
+6. Publish the updated `index.html`, `script.js`, `style.css`, and `supabase-config.js` to GitHub Pages **after** both SQL files have been run. Until the migration is applied, the old public-read policy remains active.
 
-After import, normal edits save to the shared database, and already-open pages receive live updates. If Supabase is configured but unreachable, the site reports the problem and disables edits rather than claiming local-only changes were shared.
+Do not put a service-role key, database password, or user password in the repository or browser config. The publishable key is expected to be visible to site visitors.
 
-## Visibility and access
+## Existing browser records
 
-Both funds are publicly readable to anyone who can visit the site. This includes the External Activities Fund despite its “Highly Confidential” label; that label is not access control. Editing requires a Supabase-authenticated user listed in `fund_admins`. Do not authorize an account unless it should be able to change the shared ledgers.
+Shared mode does not load or cache ledger contents in local storage. To preserve old browser-only records, an administrator should sign in on the browser that has them and use **Import this browser’s records** while that shared ledger is empty. The app clears its old local cache after import or when a non-admin account signs in.
+
+## Privacy limits
+
+The previous setup allowed public reads. Treat data that was stored before the migration as potentially exposed; applying the migration cannot recall copies already downloaded or cached. Names and birthdays were also present in previously published JavaScript. This update stops shipping the roster in new app code, but does not erase repository or browser history.
+
+The Activities Fund's 1111 PIN remains only a secondary UI prompt. Database access requires an approved signed-in account; the PIN alone grants no access. Keep the approved Activities account list small.

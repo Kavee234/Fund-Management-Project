@@ -4905,6 +4905,14 @@ tbody tr:hover {
     }
 }
 
+body.fund-read-only .collect-button,
+body.fund-read-only .additional-collection-button,
+body.fund-read-only .expense-form-panel,
+body.fund-read-only #resetButton,
+body.fund-read-only #importLocalButton {
+    display: none !important;
+}
+
 .loading-screen {
     position: fixed;
     inset: 0;

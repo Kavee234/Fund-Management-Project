@@ -1,46 +1,3 @@
-const communityMembers = [
-    { name: "Sandun", birthday: "02/11" },
-    { name: "Hiruni", birthday: "02/16" },
-    { name: "Thilina", birthday: "03/12" },
-    { name: "Supuni", birthday: "03/15" },
-    { name: "Dulan", birthday: "06/01" },
-    { name: "Nipuna", birthday: "07/04" },
-    { name: "Dulanjana", birthday: "08/04" },
-    { name: "Hirushi", birthday: "08/25" },
-    { name: "Minuli", birthday: "09/07" },
-    { name: "Chamod", birthday: "09/10" },
-    { name: "Kaveesha", birthday: "09/20" },
-    { name: "Theshan", birthday: "09/21" },
-    { name: "Anuhas", birthday: "09/22" },
-    { name: "Tharusha", birthday: "09/28" },
-    { name: "Prabuddha", birthday: "10/03" },
-    { name: "Dihen", birthday: "10/06" },
-    { name: "Charith", birthday: "10/12" },
-    { name: "Poorna", birthday: "11/09" },
-    { name: "Devindi", birthday: "11/26" },
-    { name: "Omira", birthday: "12/14" },
-    { name: "Bhanaka", birthday: "12/19" }
-];
-
-const activitiesMembers = [
-    { name: "Sandun" },
-    { name: "Thilina" },
-    { name: "Dulan" },
-    { name: "Nipuna" },
-    { name: "Dulanjana" },
-    { name: "Chamod" },
-    { name: "Theshan" },
-    { name: "Anuhas" },
-    { name: "Tharusha" },
-    { name: "Prabuddha" },
-    { name: "Dihen" },
-    { name: "Charith" },
-    { name: "Poorna" },
-    { name: "Devindi" },
-    { name: "Omira" },
-    { name: "Bhanaka" }
-];
-
 const fundMode = new URLSearchParams(window.location.search).get("fund");
 const hasSelectedFund = fundMode === "community" || fundMode === "activities";
 const isActivitiesFund = fundMode === "activities";
@@ -48,7 +5,7 @@ const activitiesAccessStorageKey = "activitiesFundAccess";
 const hasActivitiesFundAccess = !isActivitiesFund ||
     sessionStorage.getItem(activitiesAccessStorageKey) === "granted";
 const shouldOpenFund = hasSelectedFund && hasActivitiesFundAccess;
-const members = isActivitiesFund ? activitiesMembers : communityMembers;
+let members = [];
 const receiptBrandName = isActivitiesFund
     ? "External Activities Fund"
     : "බාහිර ක්‍රියාකාරකම් අපේ එකතුව";
@@ -65,7 +22,9 @@ let supabaseClient = null;
 let sharedBackendReady = !sharedBackendConfigured;
 let sharedBackendError = "";
 let sharedRevision = 0;
+let authenticatedRole = null;
 let authenticatedAdmin = false;
+let sharedRefreshTimer = null;
 let localImportAvailable = false;
 let localImportData = null;
 if (sharedBackendConfigured) {
@@ -76,7 +35,15 @@ if (sharedBackendConfigured) {
         if (!window.supabase || typeof window.supabase.createClient !== "function") {
             throw new Error("The Supabase client library did not load.");
         }
-        supabaseClient = window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey);
+        const projectRef = new URL(supabaseConfig.url).hostname.split(".")[0];
+        localStorage.removeItem(`sb-${projectRef}-auth-token`);
+        supabaseClient = window.supabase.createClient(supabaseConfig.url, supabaseConfig.anonKey, {
+            auth: {
+                storage: window.sessionStorage,
+                autoRefreshToken: true,
+                persistSession: true
+            }
+        });
     } catch (error) {
         sharedBackendError = error.message;
         console.error("Could not initialize the shared fund database.", error);
@@ -97,82 +64,79 @@ const activitiesPinModal = document.getElementById("activitiesPinModal");
 const pinModal = document.getElementById("pinModal");
 const collectionModal = document.getElementById("collectionModal");
 const receiptModal = document.getElementById("receiptModal");
-const editPinDigest = "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
 const activitiesPinDigest = "0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c";
-let monthlyContributions = loadMonthlyData();
+let monthlyContributions = {};
 let contributions = monthlyContributions[activeMonth] || createEmptyContributions();
 monthlyContributions[activeMonth] = contributions;
-let receipts = loadReceipts();
-let expenses = loadExpenses();
+let receipts = [];
+let expenses = [];
 let activeMemberIndex = null;
 let activeReceipt = null;
-let editingUnlocked = false;
 let pendingEditAction = null;
 let collectionMode = "weekly";
 
 function updateEditLockButton() {
     const button = document.getElementById("editLockButton");
-    const hasEditAccess = sharedBackendConfigured ? authenticatedAdmin : editingUnlocked;
+    const hasEditAccess = sharedBackendConfigured && authenticatedAdmin;
+    document.body.classList.toggle("fund-read-only", !hasEditAccess);
     button.textContent = sharedBackendConfigured
-        ? (authenticatedAdmin ? "Sign out" : "Admin sign in")
-        : (editingUnlocked ? "Lock editing" : "Unlock editing");
+        ? (authenticatedRole ? "Sign out" : "Sign in")
+        : "Private storage unavailable";
     button.setAttribute("aria-pressed", String(hasEditAccess));
     button.classList.toggle("button-primary", hasEditAccess);
     button.classList.toggle("button-quiet", !hasEditAccess);
     const resetButton = document.getElementById("resetButton");
     resetButton.disabled = sharedBackendConfigured
         ? !authenticatedAdmin || !sharedBackendReady
-        : !editingUnlocked;
+        : true;
     resetButton.title = hasEditAccess
         ? "Reset this fund's saved records"
         : "Sign in as an admin to enable record resets";
     const resetAccessNote = document.getElementById("resetAccessNote");
     resetAccessNote.textContent = sharedBackendConfigured
-        ? "Sign in with an authorized admin account to reset records."
-        : "Unlock editing with the PIN to reset records.";
+        ? (authenticatedRole && !authenticatedAdmin
+            ? "Your approved account is read-only."
+            : "Sign in with an authorized admin account to reset records.")
+        : "Private storage is not configured.";
     resetAccessNote.hidden = hasEditAccess;
     document.getElementById("importLocalButton").hidden =
         !sharedBackendConfigured || !sharedBackendReady || !authenticatedAdmin || !localImportAvailable;
 }
 
 function requestEditAccess(action) {
-    if (sharedBackendConfigured) {
-        if (!sharedBackendReady || sharedBackendError) {
-            document.getElementById("syncNotice").textContent =
-                "The shared database is unavailable. Changes are disabled to avoid saving only on this device.";
-            document.getElementById("syncNotice").hidden = false;
+    if (!sharedBackendConfigured) {
+        setSyncStatus("Private storage is not configured. Viewing and editing are disabled.", true);
+        return false;
+    }
+    if (authenticatedAdmin) {
+        if (action && localImportAvailable) {
+            setSyncStatus("Import this browser’s existing records before making new changes.", true);
             return false;
         }
-        if (authenticatedAdmin) {
-            return true;
-        }
-    } else if (editingUnlocked) {
         return true;
+    }
+    if (action && authenticatedRole) {
+        setSyncStatus("Only an authorized fund administrator can change records.", true);
+        return false;
     }
 
     pendingEditAction = action || null;
     document.getElementById("pinMessage").textContent = "";
-    document.getElementById("editPin").value = "";
     document.getElementById("adminEmail").value = "";
     document.getElementById("adminPassword").value = "";
-    document.getElementById("localPinField").hidden = sharedBackendConfigured;
-    document.getElementById("adminEmailField").hidden = !sharedBackendConfigured;
-    document.getElementById("adminPasswordField").hidden = !sharedBackendConfigured;
-    document.getElementById("editPin").required = !sharedBackendConfigured;
-    document.getElementById("adminEmail").required = sharedBackendConfigured;
-    document.getElementById("adminPassword").required = sharedBackendConfigured;
-    document.getElementById("editAccessIntro").textContent = sharedBackendConfigured
-        ? "Sign in with the fund administrator account to edit shared records."
-        : "Enter the local PIN to record collections, add expenses, or reset records.";
-    document.getElementById("pinTitle").textContent =
-        sharedBackendConfigured ? "Admin sign in" : "Unlock editing";
-    document.getElementById("editAccessDisclaimer").textContent = sharedBackendConfigured
-        ? "Only an administrator authorized in the shared database can change records."
-        : "This 4-digit PIN is a convenience lock only. It can be bypassed and is not secure authentication.";
-    document.getElementById("editAccessSubmit").textContent = sharedBackendConfigured ? "Sign in" : "Unlock";
+    document.getElementById("adminEmailField").hidden = false;
+    document.getElementById("adminPasswordField").hidden = false;
+    document.getElementById("adminEmail").required = true;
+    document.getElementById("adminPassword").required = true;
+    document.getElementById("editAccessIntro").textContent =
+        "Sign in with an approved account to view this private fund. Only administrators can edit records.";
+    document.getElementById("pinTitle").textContent = "Sign in to the private fund";
+    document.getElementById("editAccessDisclaimer").textContent =
+        "Your fund access is checked by the database.";
+    document.getElementById("editAccessSubmit").textContent = "Sign in";
     pinModal.hidden = false;
     document.body.classList.add("modal-open");
-    document.getElementById(sharedBackendConfigured ? "adminEmail" : "editPin").focus();
+    document.getElementById("adminEmail").focus();
     return false;
 }
 
@@ -184,69 +148,41 @@ function closePinModal() {
 
 async function submitPin(event) {
     event.preventDefault();
-    if (sharedBackendConfigured) {
-        const message = document.getElementById("pinMessage");
-        try {
-            const { data, error } = await supabaseClient.auth.signInWithPassword({
-                email: document.getElementById("adminEmail").value.trim(),
-                password: document.getElementById("adminPassword").value
-            });
-            if (error) {
-                throw error;
-            }
-            const { data: adminRecord, error: adminError } = await supabaseClient
-                .from("fund_admins")
-                .select("user_id")
-                .eq("user_id", data.user.id)
-                .maybeSingle();
-            if (adminError) {
-                throw adminError;
-            }
-            if (!adminRecord) {
-                await supabaseClient.auth.signOut();
-                throw new Error("This account is not authorized to edit fund records.");
-            }
-            authenticatedAdmin = true;
-            const action = pendingEditAction;
-            pendingEditAction = null;
-            updateEditLockButton();
-            closePinModal();
-            if (action) {
-                action();
-            }
-        } catch (error) {
-            console.error("Could not sign in to the shared fund.", error);
-            message.textContent = error.message || "Sign-in failed. Check your credentials and try again.";
-        }
+    if (!sharedBackendConfigured || !supabaseClient) {
+        setSyncStatus("Private storage is unavailable. No records were loaded or saved.", true);
         return;
     }
 
-    const input = document.getElementById("editPin");
-    let submittedPinDigest;
     try {
-        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input.value));
-        submittedPinDigest = Array.from(new Uint8Array(digest), byte =>
-            byte.toString(16).padStart(2, "0")).join("");
+        const { error } = await supabaseClient.auth.signInWithPassword({
+            email: document.getElementById("adminEmail").value.trim(),
+            password: document.getElementById("adminPassword").value
+        });
+        if (error) {
+            throw error;
+        }
+        let snapshot;
+        try {
+            snapshot = await fetchSharedLedger();
+        } catch (accessError) {
+            await supabaseClient.auth.signOut();
+            throw accessError;
+        }
+        activateSharedAccess(snapshot);
+        const action = pendingEditAction;
+        pendingEditAction = null;
+        closePinModal();
+        if (action) {
+            if (authenticatedAdmin) {
+                action();
+            } else {
+                setSyncStatus("Your account can view this fund but cannot edit records.", true);
+            }
+        }
     } catch (error) {
-        console.error("Could not verify the editing PIN.", error);
+        console.error("Could not sign in to the private fund.", error);
         document.getElementById("pinMessage").textContent =
-            "Could not verify the PIN in this browser. Try a current browser over HTTPS.";
-        return;
-    }
-
-    if (submittedPinDigest !== editPinDigest) {
-        document.getElementById("pinMessage").textContent = "Incorrect PIN. Try again.";
-        input.select();
-        return;
-    }
-
-    const action = pendingEditAction;
-    pendingEditAction = null;
-    editingUnlocked = true;
-    updateEditLockButton();
-    closePinModal();
-    if (action) {
-        action();
+            "Sign-in failed or this account is not approved for this fund.";
     }
 }
 
@@ -367,6 +303,20 @@ function renderFundData() {
     renderTransactions();
 }
 
+function renderMemberFilters() {
+    transactionFilter.replaceChildren();
+    const allMembersOption = document.createElement("option");
+    allMembersOption.value = "all";
+    allMembersOption.textContent = members.length === 1 ? "My records" : "All members";
+    transactionFilter.appendChild(allMembersOption);
+    members.forEach((member, index) => {
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = member.name;
+        transactionFilter.appendChild(option);
+    });
+}
+
 function loadMonthlyData() {
     const storedMonthlyData = localStorage.getItem(monthlyStorageKey);
     if (storedMonthlyData) {
@@ -450,6 +400,14 @@ function loadExpenses() {
     }
 }
 
+function readLocalFundData() {
+    return {
+        monthlyContributions: loadMonthlyData(),
+        receipts: loadReceipts(),
+        expenses: loadExpenses()
+    };
+}
+
 function setSyncStatus(message, isError = false) {
     const notice = document.getElementById("syncNotice");
     notice.hidden = false;
@@ -457,17 +415,17 @@ function setSyncStatus(message, isError = false) {
     notice.classList.toggle("storage-warning", isError);
 }
 
-function saveLocalFundCache() {
-    try {
-        localStorage.setItem(monthlyStorageKey, JSON.stringify(monthlyContributions));
-        localStorage.removeItem(storageKey);
-        localStorage.setItem(receiptsStorageKey, JSON.stringify(receipts));
-        localStorage.setItem(expensesStorageKey, JSON.stringify(expenses));
-        return true;
-    } catch (error) {
-        console.error("Could not update the local fund cache.", error);
-        return false;
-    }
+function clearLocalFundCache(fundId = storagePrefix) {
+    const prefix = fundId === "activitiesFund" ? "activitiesFund" : "fund";
+    localStorage.removeItem(`${prefix}MonthlyData`);
+    localStorage.removeItem(prefix === "activitiesFund" ? "activitiesFundData" : "fundData");
+    localStorage.removeItem(`${prefix}Receipts`);
+    localStorage.removeItem(`${prefix}Expenses`);
+}
+
+function clearAllLocalFundCaches() {
+    clearLocalFundCache("fund");
+    clearLocalFundCache("activitiesFund");
 }
 
 async function saveSharedState() {
@@ -495,42 +453,108 @@ async function saveSharedState() {
     }
 
     sharedRevision = data.revision;
-    const localBackupSaved = saveLocalFundCache();
-    storageStatus.textContent = "Changes are saved to the shared fund for everyone.";
-    setSyncStatus(localBackupSaved
-        ? "Shared fund records saved. Everyone visiting this fund can see the latest data."
-        : "Shared records were saved, but this browser’s local backup could not be updated.", !localBackupSaved);
+    localImportAvailable = false;
+    localImportData = null;
+    clearLocalFundCache();
+    storageStatus.textContent = "Changes are saved to the private shared fund.";
+    setSyncStatus("Shared fund records saved.");
 }
 
-async function checkAdminAccess(userId) {
-    if (!userId) {
-        return false;
-    }
-
-    const { data, error } = await supabaseClient
-        .from("fund_admins")
-        .select("user_id")
-        .eq("user_id", userId)
-        .maybeSingle();
+async function fetchSharedLedger() {
+    const { data, error } = await supabaseClient.rpc("read_fund_ledger", {
+        p_fund_id: storagePrefix
+    });
     if (error) {
         throw error;
     }
-    return Boolean(data);
+    if (!data || !Array.isArray(data.members) || !data.data ||
+        !Number.isSafeInteger(data.revision)) {
+        throw new TypeError("The private fund response has an invalid format.");
+    }
+    return data;
+}
+
+function activateSharedAccess(snapshot) {
+    const validRoles = isActivitiesFund
+        ? ["admin", "activities_viewer"]
+        : ["admin", "community_member"];
+    if (!validRoles.includes(snapshot.role) ||
+        snapshot.members.some(member => !member || typeof member.name !== "string")) {
+        throw new TypeError("This account is not authorized to view this fund.");
+    }
+
+    members = snapshot.members.map(member => ({
+        name: member.name,
+        ...(typeof member.birthday === "string" ? { birthday: member.birthday } : {})
+    }));
+    applyFundData(snapshot.data);
+    renderMemberFilters();
+    renderExpenseMembers();
+    sharedRevision = snapshot.revision;
+    authenticatedRole = snapshot.role;
+    authenticatedAdmin = snapshot.role === "admin";
+    sharedBackendReady = true;
+    sharedBackendError = "";
+    document.getElementById("appShell").hidden = false;
+
+    if (authenticatedAdmin && isEmptyFundData(snapshot.data)) {
+        localImportData = readLocalFundData();
+        localImportAvailable = !isEmptyFundData(localImportData);
+    } else {
+        localImportData = null;
+        localImportAvailable = false;
+        if (authenticatedAdmin) {
+            clearLocalFundCache();
+        } else {
+            clearAllLocalFundCaches();
+        }
+    }
+
+    document.querySelector(".masthead-status").textContent =
+        authenticatedAdmin ? "Admin connected" : "Private fund";
+    document.querySelector(".local-badge").textContent = "Private shared records";
+    storageStatus.textContent = "Records are loaded for your approved account.";
+    document.getElementById("heroMemberCount").textContent = String(members.length);
+    document.getElementById("summaryRowCount").textContent = `${members.length} members`;
+    document.getElementById("summaryNoteMembersCount").textContent = String(members.length);
+    updateEditLockButton();
+    setSyncStatus(authenticatedAdmin
+        ? "Administrator access is active."
+        : (isActivitiesFund
+            ? "Activities Fund access is limited to its approved group."
+            : "Only your community records and receipts are shown."));
 }
 
 async function loadSharedLedger() {
-    const { data, error } = await supabaseClient
-        .from("fund_ledgers")
-        .select("data, revision, updated_at")
-        .eq("fund_id", storagePrefix)
-        .single();
-    if (error) {
-        throw error;
-    }
+    const snapshot = await fetchSharedLedger();
+    activateSharedAccess(snapshot);
+    return snapshot;
+}
 
-    applyFundData(data.data);
-    sharedRevision = data.revision;
-    return data;
+function clearSharedView(clearLocalCache = true) {
+    if (sharedRefreshTimer) {
+        window.clearInterval(sharedRefreshTimer);
+        sharedRefreshTimer = null;
+    }
+    authenticatedRole = null;
+    authenticatedAdmin = false;
+    sharedBackendReady = false;
+    sharedRevision = 0;
+    localImportAvailable = false;
+    localImportData = null;
+    members = [];
+    monthlyContributions = {};
+    contributions = createEmptyContributions();
+    receipts = [];
+    expenses = [];
+    if (clearLocalCache) {
+        clearAllLocalFundCaches();
+    }
+    document.getElementById("appShell").hidden = true;
+    renderMemberFilters();
+    renderExpenseMembers();
+    renderFundData();
+    updateEditLockButton();
 }
 
 function isEmptyFundData(data) {
@@ -540,31 +564,25 @@ function isEmptyFundData(data) {
 }
 
 function subscribeToSharedLedger() {
-    supabaseClient
-        .channel(`fund-ledger-${storagePrefix}`)
-        .on("postgres_changes", {
-            event: "UPDATE",
-            schema: "public",
-            table: "fund_ledgers",
-            filter: `fund_id=eq.${storagePrefix}`
-        }, payload => {
-            if (!payload.new || payload.new.revision <= sharedRevision) {
-                return;
+    if (sharedRefreshTimer) {
+        window.clearInterval(sharedRefreshTimer);
+    }
+    sharedRefreshTimer = window.setInterval(async () => {
+        try {
+            const snapshot = await fetchSharedLedger();
+            if (snapshot.revision > sharedRevision) {
+                activateSharedAccess(snapshot);
+                setSyncStatus("Your approved fund view was refreshed.");
             }
-            try {
-                applyFundData(payload.new.data);
-                sharedRevision = payload.new.revision;
-                setSyncStatus("The shared ledger was updated in another session.");
-            } catch (error) {
-                console.error("Could not apply a shared ledger update.", error);
-                setSyncStatus(`A shared update could not be displayed: ${error.message}`, true);
-            }
-        })
-        .subscribe(status => {
-            if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-                setSyncStatus("Live updates are unavailable. Reload the page to check for newer records.", true);
-            }
-        });
+        } catch (error) {
+            console.error("Could not refresh the private fund.", error);
+            clearSharedView(false);
+            document.querySelector(".masthead-status").textContent = "Sign in required";
+            document.querySelector(".local-badge").textContent = "No records displayed";
+            setSyncStatus("The private fund could not be refreshed. Reload and sign in again.", true);
+            requestEditAccess();
+        }
+    }, 30000);
 }
 
 async function initializeSharedBackend() {
@@ -572,19 +590,18 @@ async function initializeSharedBackend() {
         return;
     }
 
-    localImportData = captureFundData();
     const mastheadStatus = document.querySelector(".masthead-status");
     const localBadge = document.querySelector(".local-badge");
     if (!sharedBackendConfigured) {
-        mastheadStatus.textContent = "Saved locally";
-        localBadge.textContent = "Local records";
-        setSyncStatus("Shared storage is not configured. These records are only saved in this browser.", true);
+        mastheadStatus.textContent = "Private storage unavailable";
+        localBadge.textContent = "No records displayed";
+        setSyncStatus("Private storage is not configured. Viewing and editing are disabled.", true);
         return;
     }
 
     mastheadStatus.textContent = "Connecting to shared fund";
-    localBadge.textContent = "Loading shared records";
-    setSyncStatus("Loading the shared fund…");
+    localBadge.textContent = "Checking private access";
+    setSyncStatus("Checking your access…");
     try {
         if (!supabaseClient) {
             throw new Error(sharedBackendError || "The shared database client is unavailable.");
@@ -593,28 +610,30 @@ async function initializeSharedBackend() {
         if (sessionError) {
             throw sessionError;
         }
-        authenticatedAdmin = await checkAdminAccess(sessionData.session && sessionData.session.user.id);
-        const ledger = await loadSharedLedger();
-        sharedBackendReady = true;
-        localImportAvailable = isEmptyFundData(ledger.data) && !isEmptyFundData(localImportData);
-        mastheadStatus.textContent = authenticatedAdmin ? "Admin connected" : "Shared fund";
-        localBadge.textContent = "Live shared records";
-        storageStatus.textContent = "Records are loaded from the shared fund.";
-        updateEditLockButton();
-        setSyncStatus(isActivitiesFund
-            ? "The External Activities Fund is public: anyone visiting this site can view its records."
-            : "Showing the shared community fund. Anyone visiting this fund can view its records.");
+        if (!sessionData.session) {
+            sharedBackendReady = false;
+            authenticatedRole = null;
+            authenticatedAdmin = false;
+            mastheadStatus.textContent = "Sign in required";
+            localBadge.textContent = "Private fund";
+            setSyncStatus("Sign in with an approved account to view this private fund.");
+            updateEditLockButton();
+            requestEditAccess();
+            return;
+        }
+
+        await loadSharedLedger();
         subscribeToSharedLedger();
     } catch (error) {
         sharedBackendError = error.message || "The shared database could not be reached.";
-        sharedBackendReady = false;
-        authenticatedAdmin = false;
-        mastheadStatus.textContent = "Shared fund unavailable";
-        localBadge.textContent = "Local records only";
-        storageStatus.textContent = "The shared fund could not be loaded; this browser’s local records are shown.";
+        clearSharedView(false);
+        mastheadStatus.textContent = "Private access unavailable";
+        localBadge.textContent = "No records displayed";
+        storageStatus.textContent = "No private records are displayed until access is verified.";
         console.error("Could not load the shared fund.", error);
-        setSyncStatus(`Could not load shared records: ${sharedBackendError}. Showing this browser’s local data only.`, true);
+        setSyncStatus("Could not verify access. Confirm your account is approved, then try again.", true);
         updateEditLockButton();
+        requestEditAccess();
     }
 }
 
@@ -631,6 +650,8 @@ async function importLocalRecords() {
         applyFundData(localImportData);
         await saveSharedState();
         localImportAvailable = false;
+        localImportData = null;
+        clearLocalFundCache();
         updateEditLockButton();
         setSyncStatus("This browser’s records were imported into the shared fund.");
     } catch (error) {
@@ -641,28 +662,14 @@ async function importLocalRecords() {
 }
 
 async function saveData() {
+    if (!sharedBackendConfigured) {
+        setSyncStatus("Private storage is not configured. Changes were not saved.", true);
+        return false;
+    }
     const previousMonthData = monthlyContributions[activeMonth];
     monthlyContributions[activeMonth] = contributions;
-    if (sharedBackendConfigured) {
-        try {
-            await saveSharedState();
-            return true;
-        } catch (error) {
-            if (previousMonthData === undefined) {
-                delete monthlyContributions[activeMonth];
-            } else {
-                monthlyContributions[activeMonth] = previousMonthData;
-            }
-            console.error("Could not save shared fund contributions.", error);
-            setSyncStatus(`Could not save shared contributions: ${error.message}`, true);
-            return false;
-        }
-    }
-
     try {
-        localStorage.setItem(monthlyStorageKey, JSON.stringify(monthlyContributions));
-        storageStatus.innerHTML = '<span class="online-dot" aria-hidden="true"></span> Changes are saved automatically in this browser.';
-        storageStatus.classList.remove("storage-warning");
+        await saveSharedState();
         return true;
     } catch (error) {
         if (previousMonthData === undefined) {
@@ -670,58 +677,45 @@ async function saveData() {
         } else {
             monthlyContributions[activeMonth] = previousMonthData;
         }
-        console.error("Could not save contribution data.", error);
-        storageStatus.textContent = "Could not save changes in this browser. Check available storage and try again.";
-        storageStatus.classList.add("storage-warning");
+        console.error("Could not save shared fund contributions.", error);
+        setSyncStatus(`Could not save shared contributions: ${error.message}`, true);
         return false;
     }
 }
 
 async function saveReceipts() {
-    if (sharedBackendConfigured) {
-        try {
-            await saveSharedState();
-            return true;
-        } catch (error) {
-            console.error("Could not save shared receipt history.", error);
-            setSyncStatus(`Could not save the receipt to the shared fund: ${error.message}`, true);
-            return false;
-        }
+    if (!sharedBackendConfigured) {
+        setSyncStatus("Private storage is not configured. Changes were not saved.", true);
+        return false;
     }
 
     try {
-        localStorage.setItem(receiptsStorageKey, JSON.stringify(receipts));
+        await saveSharedState();
         return true;
     } catch (error) {
-        console.error("Could not save the receipt history.", error);
+        console.error("Could not save shared receipt history.", error);
+        setSyncStatus(`Could not save the receipt to the private fund: ${error.message}`, true);
         return false;
     }
 }
 
 async function saveExpenses(nextExpenses) {
-    if (sharedBackendConfigured) {
-        const previousExpenses = expenses;
-        expenses = nextExpenses;
-        try {
-            await saveSharedState();
-            return true;
-        } catch (error) {
-            expenses = previousExpenses;
-            console.error("Could not save shared expenses.", error);
-            document.getElementById("expenseMessage").textContent =
-                `Could not save this expense to the shared fund: ${error.message}`;
-            setSyncStatus("The expense was not saved to the shared fund.", true);
-            return false;
-        }
+    if (!sharedBackendConfigured) {
+        setSyncStatus("Private storage is not configured. Changes were not saved.", true);
+        return false;
     }
 
+    const previousExpenses = expenses;
+    expenses = nextExpenses;
     try {
-        localStorage.setItem(expensesStorageKey, JSON.stringify(nextExpenses));
+        await saveSharedState();
         return true;
     } catch (error) {
-        console.error("Could not save the expense.", error);
+        expenses = previousExpenses;
+        console.error("Could not save shared expenses.", error);
         document.getElementById("expenseMessage").textContent =
-            "Could not save this expense in the browser. Check available storage and try again.";
+            `Could not save this expense to the private fund: ${error.message}`;
+        setSyncStatus("The expense was not saved to the private fund.", true);
         return false;
     }
 }
@@ -1389,11 +1383,6 @@ async function selectMonth(monthKey) {
         return;
     }
 
-    if (!sharedBackendConfigured && !(await saveData())) {
-        monthSelector.value = activeMonth;
-        return;
-    }
-
     activeMonth = monthKey;
     contributions = monthlyContributions[activeMonth] || createEmptyContributions();
     monthlyContributions[activeMonth] = contributions;
@@ -1452,14 +1441,6 @@ function exportCsv() {
     URL.revokeObjectURL(url);
 }
 
-function restoreStorageValue(key, value) {
-    if (value === null) {
-        localStorage.removeItem(key);
-    } else {
-        localStorage.setItem(key, value);
-    }
-}
-
 async function resetRecords() {
     if (!requestEditAccess(resetRecords)) {
         return;
@@ -1472,70 +1453,23 @@ async function resetRecords() {
         return;
     }
 
-    if (sharedBackendConfigured) {
-        const previousState = captureFundData();
-        monthlyContributions = {};
-        contributions = createEmptyContributions();
-        monthlyContributions[activeMonth] = contributions;
-        receipts = [];
-        expenses = [];
-        try {
-            await saveSharedState();
-        } catch (error) {
-            console.error("Could not reset the shared records.", error);
-            applyFundData(previousState);
-            document.getElementById("resetMessage").textContent =
-                `Reset failed. Shared records were kept: ${error.message}`;
-            return;
-        }
-        renderFundData();
-        document.getElementById("resetMessage").textContent =
-            "All monthly contributions, expenses, and saved receipts have been reset.";
-        return;
-    }
-
-    const previousData = localStorage.getItem(monthlyStorageKey);
-    const previousLegacyData = localStorage.getItem(storageKey);
-    const previousReceipts = localStorage.getItem(receiptsStorageKey);
-    const previousExpenses = localStorage.getItem(expensesStorageKey);
-
-    try {
-        localStorage.setItem(monthlyStorageKey, JSON.stringify({}));
-        localStorage.removeItem(storageKey);
-        localStorage.setItem(receiptsStorageKey, JSON.stringify([]));
-        localStorage.setItem(expensesStorageKey, JSON.stringify([]));
-    } catch (error) {
-        console.error("Could not reset the saved records.", error);
-        let rollbackFailed = false;
-        [
-            [monthlyStorageKey, previousData],
-            [storageKey, previousLegacyData],
-            [receiptsStorageKey, previousReceipts],
-            [expensesStorageKey, previousExpenses]
-        ].forEach(([key, value]) => {
-            try {
-                restoreStorageValue(key, value);
-            } catch (rollbackError) {
-                console.error(`Could not restore ${key} after the reset failed.`, rollbackError);
-                rollbackFailed = true;
-            }
-        });
-        document.getElementById("resetMessage").textContent = rollbackFailed
-            ? "Reset failed and some records could not be restored. Reload the page and verify your data."
-            : "Reset failed. Your saved records were kept.";
-        return;
-    }
-
+    const previousState = captureFundData();
     monthlyContributions = {};
     contributions = createEmptyContributions();
     monthlyContributions[activeMonth] = contributions;
     receipts = [];
     expenses = [];
-    renderMembers();
-    renderSummaryTable();
-    updateSummary();
-    renderRecentCollections();
-    renderTransactions();
+    try {
+        await saveSharedState();
+    } catch (error) {
+        console.error("Could not reset the shared records.", error);
+        applyFundData(previousState);
+        document.getElementById("resetMessage").textContent =
+            `Reset failed. Shared records were kept: ${error.message}`;
+        return;
+    }
+
+    renderFundData();
     document.getElementById("resetMessage").textContent =
         "All monthly contributions, expenses, and saved receipts have been reset.";
 }
@@ -1997,7 +1931,7 @@ async function downloadReceiptImage() {
 }
 
 document.getElementById("fundPicker").hidden = shouldOpenFund;
-document.getElementById("appShell").hidden = !shouldOpenFund;
+document.getElementById("appShell").hidden = sharedBackendConfigured || !shouldOpenFund;
 if (hasSelectedFund) {
     const fundName = isActivitiesFund
         ? "External Activities Fund ( Highly Confidential )"
@@ -2051,7 +1985,7 @@ activitiesPinModal.addEventListener("click", event => {
 });
 document.getElementById("editLockButton").addEventListener("click", async () => {
     if (sharedBackendConfigured) {
-        if (!authenticatedAdmin) {
+        if (!authenticatedRole) {
             requestEditAccess();
             return;
         }
@@ -2060,10 +1994,35 @@ document.getElementById("editLockButton").addEventListener("click", async () => 
             if (error) {
                 throw error;
             }
+            if (sharedRefreshTimer) {
+                window.clearInterval(sharedRefreshTimer);
+                sharedRefreshTimer = null;
+            }
+            const keepUnimportedLocalData = authenticatedAdmin && localImportAvailable;
+            authenticatedRole = null;
             authenticatedAdmin = false;
+            sharedBackendReady = false;
+            sharedRevision = 0;
+            localImportAvailable = false;
+            localImportData = null;
+            members = [];
+            monthlyContributions = {};
+            contributions = createEmptyContributions();
+            receipts = [];
+            expenses = [];
+            if (keepUnimportedLocalData) {
+                clearLocalFundCache(storagePrefix === "fund" ? "activitiesFund" : "fund");
+            } else {
+                clearAllLocalFundCaches();
+            }
+            renderMemberFilters();
+            renderExpenseMembers();
+            renderFundData();
+            document.getElementById("appShell").hidden = true;
             updateEditLockButton();
-            document.querySelector(".masthead-status").textContent = "Shared fund";
-            setSyncStatus("Signed out. The shared fund remains visible; sign in as an admin to edit it.");
+            document.querySelector(".masthead-status").textContent = "Sign in required";
+            setSyncStatus("Signed out. Sign in with an approved account to view this private fund.");
+            requestEditAccess();
         } catch (error) {
             console.error("Could not sign out of the shared fund.", error);
             setSyncStatus(`Could not sign out: ${error.message}`, true);
@@ -2071,11 +2030,6 @@ document.getElementById("editLockButton").addEventListener("click", async () => 
         return;
     }
 
-    if (editingUnlocked) {
-        editingUnlocked = false;
-        updateEditLockButton();
-        return;
-    }
     requestEditAccess();
 });
 document.getElementById("importLocalButton").addEventListener("click", importLocalRecords);
@@ -2093,16 +2047,7 @@ monthSelector.value = activeMonth;
 document.getElementById("currentMonth").textContent = formatMonthName(activeMonth);
 document.getElementById("expenseMonth").textContent = formatMonthName(activeMonth);
 document.getElementById("membersCount").textContent = String(members.length);
-const allMembersOption = document.createElement("option");
-allMembersOption.value = "all";
-allMembersOption.textContent = "All members";
-transactionFilter.appendChild(allMembersOption);
-members.forEach((member, index) => {
-    const option = document.createElement("option");
-    option.value = String(index);
-    option.textContent = member.name;
-    transactionFilter.appendChild(option);
-});
+renderMemberFilters();
 renderExpenseMembers();
 renderMembers();
 renderSummaryTable();

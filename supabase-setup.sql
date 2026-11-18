@@ -12,15 +12,23 @@ create table if not exists public.fund_admins (
 alter table public.fund_ledgers enable row level security;
 alter table public.fund_admins enable row level security;
 
-grant select on public.fund_ledgers to anon, authenticated;
+revoke all on public.fund_ledgers from anon;
+grant select on public.fund_ledgers to authenticated;
 grant insert, update on public.fund_ledgers to authenticated;
 grant select on public.fund_admins to authenticated;
 
 drop policy if exists "Anyone can view fund ledgers" on public.fund_ledgers;
-create policy "Anyone can view fund ledgers"
+drop policy if exists "Fund admins can view ledgers" on public.fund_ledgers;
+create policy "Fund admins can view ledgers"
     on public.fund_ledgers for select
-    to anon, authenticated
-    using (true);
+    to authenticated
+    using (
+        exists (
+            select 1
+            from public.fund_admins
+            where user_id = (select auth.uid())
+        )
+    );
 
 drop policy if exists "Fund admins can insert ledgers" on public.fund_ledgers;
 create policy "Fund admins can insert ledgers"
