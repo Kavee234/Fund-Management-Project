@@ -289,6 +289,22 @@ button {
     display: none;
 }
 
+#editLockButton[hidden],
+.share-notice[hidden] {
+    display: none;
+}
+
+.share-notice {
+    margin: -12px 0 20px;
+    padding: 11px 14px;
+    border: 1px solid #dce8dd;
+    border-radius: 9px;
+    background: #edf4ed;
+    color: #526359;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
 .welcome-card {
     position: relative;
     display: flex;

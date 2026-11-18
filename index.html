@@ -52,7 +52,8 @@
             </a>
         </div>
         <p class="fund-picker-disclaimer">“Highly Confidential” is a label only. The 4-digit editing PIN is a
-            convenience lock, not secure authentication; records stay in this browser.</p>
+            convenience lock, not secure authentication. Records stay in this browser unless you create a share link;
+            anyone with that link can view its read-only snapshot.</p>
         <p class="picker-powered-by powered-by">Powered by <strong>DP Creations</strong></p>
     </main>
 
@@ -100,6 +101,7 @@
                         Unlock editing
                     </button>
                     <button class="button button-quiet" id="changeFundButton" type="button">Choose fund</button>
+                    <button class="button button-quiet" id="shareButton" type="button">Copy share link</button>
                     <label class="month-picker-group" for="monthSelector">
                         <span>MONTH</span>
                         <input id="monthSelector" type="month" aria-label="Select collection month">
@@ -110,6 +112,7 @@
                     </button>
                 </div>
             </header>
+            <p class="share-notice" id="shareNotice" role="status" aria-live="polite" hidden></p>
 
             <section class="view-panel" id="overviewView" aria-labelledby="welcomeTitle">
                 <div class="welcome-card">

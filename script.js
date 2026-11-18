@@ -55,8 +55,11 @@ const monthlyStorageKey = `${storagePrefix}MonthlyData`;
 const activeMonthStorageKey = `${storagePrefix}ActiveMonth`;
 const receiptsStorageKey = `${storagePrefix}Receipts`;
 const expensesStorageKey = `${storagePrefix}Expenses`;
+let sharedSnapshotError = "";
+const sharedSnapshot = loadSharedSnapshot();
+const isSharedView = sharedSnapshot !== null;
 const currentMonthKey = getMonthKey(new Date());
-const savedActiveMonth = localStorage.getItem(activeMonthStorageKey);
+const savedActiveMonth = sharedSnapshot ? sharedSnapshot.activeMonth : localStorage.getItem(activeMonthStorageKey);
 let activeMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(savedActiveMonth || "") ? savedActiveMonth : currentMonthKey;
 const summaryTable = document.getElementById("summaryTable");
 const memberGrid = document.getElementById("membersGrid");
@@ -81,14 +84,71 @@ let editingUnlocked = false;
 let pendingEditAction = null;
 let collectionMode = "weekly";
 
+function loadSharedSnapshot() {
+    if (!window.location.hash.startsWith("#share=")) {
+        return null;
+    }
+
+    try {
+        const encodedData = window.location.hash.slice("#share=".length).replace(/-/g, "+").replace(/_/g, "/");
+        if (!encodedData || encodedData.length > 500000) {
+            throw new RangeError("The shared snapshot is empty or too large.");
+        }
+        const binaryData = atob(encodedData.padEnd(Math.ceil(encodedData.length / 4) * 4, "="));
+        const bytes = Uint8Array.from(binaryData, character => character.charCodeAt(0));
+        const snapshot = JSON.parse(new TextDecoder().decode(bytes));
+        const expectedFund = isActivitiesFund ? "activities" : "community";
+        const validMonth = month => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
+        if (!snapshot || snapshot.version !== 1 || snapshot.fund !== expectedFund ||
+            !validMonth(snapshot.activeMonth) || !snapshot.monthlyContributions ||
+            Array.isArray(snapshot.monthlyContributions) ||
+            typeof snapshot.monthlyContributions !== "object" ||
+            !Array.isArray(snapshot.receipts) || !Array.isArray(snapshot.expenses)) {
+            throw new TypeError("The shared snapshot has an unsupported or invalid format.");
+        }
+
+        const monthlyContributions = {};
+        Object.entries(snapshot.monthlyContributions).forEach(([month, monthData]) => {
+            if (!validMonth(month) || !Array.isArray(monthData)) {
+                throw new TypeError("The shared snapshot contains invalid monthly contributions.");
+            }
+            monthlyContributions[month] = normalizeContributions(monthData);
+        });
+        const validReceipts = snapshot.receipts.every(receipt =>
+            receipt && typeof receipt.id === "string" &&
+            Number.isInteger(receipt.memberIndex) && receipt.memberIndex >= 0 &&
+            receipt.memberIndex < members.length &&
+            typeof receipt.memberName === "string" && validMonth(receipt.month) &&
+            typeof receipt.date === "string" && !Number.isNaN(Date.parse(receipt.date)) &&
+            Number.isFinite(receipt.amount) && receipt.amount >= 0 &&
+            (!receipt.weeks || (Array.isArray(receipt.weeks) &&
+                receipt.weeks.every(week => Number.isInteger(week) && week >= 1 && week <= 4))));
+        if (!validReceipts) {
+            throw new TypeError("The shared snapshot contains invalid receipt records.");
+        }
+
+        return {
+            activeMonth: snapshot.activeMonth,
+            monthlyContributions,
+            receipts: snapshot.receipts,
+            expenses: snapshot.expenses
+        };
+    } catch (error) {
+        console.error("Could not read the shared fund snapshot.", error);
+        sharedSnapshotError = "This share link is invalid or damaged. Showing this browser’s locally saved records instead.";
+        return null;
+    }
+}
+
 function updateEditLockButton() {
     const button = document.getElementById("editLockButton");
+    button.hidden = isSharedView;
     button.textContent = editingUnlocked ? "Lock editing" : "Unlock editing";
     button.setAttribute("aria-pressed", String(editingUnlocked));
     button.classList.toggle("button-primary", editingUnlocked);
     button.classList.toggle("button-quiet", !editingUnlocked);
     const resetButton = document.getElementById("resetButton");
-    resetButton.disabled = !editingUnlocked;
+    resetButton.disabled = !editingUnlocked || isSharedView;
     resetButton.title = editingUnlocked
         ? "Reset this fund's saved records"
         : "Unlock editing to enable record resets";
@@ -96,6 +156,12 @@ function updateEditLockButton() {
 }
 
 function requestEditAccess(action) {
+    if (isSharedView) {
+        document.getElementById("shareNotice").textContent =
+            "This is a read-only snapshot. Open the regular fund link to edit records.";
+        return false;
+    }
+
     if (editingUnlocked) {
         return true;
     }
@@ -158,6 +224,10 @@ function normalizeContributions(data) {
 }
 
 function loadMonthlyData() {
+    if (sharedSnapshot) {
+        return sharedSnapshot.monthlyContributions;
+    }
+
     const storedMonthlyData = localStorage.getItem(monthlyStorageKey);
     if (storedMonthlyData) {
         try {
@@ -201,6 +271,10 @@ function loadMonthlyData() {
 }
 
 function loadReceipts() {
+    if (sharedSnapshot) {
+        return sharedSnapshot.receipts;
+    }
+
     const storedReceipts = localStorage.getItem(receiptsStorageKey);
     if (!storedReceipts) {
         return [];
@@ -221,7 +295,9 @@ function loadReceipts() {
 }
 
 function loadExpenses() {
-    const storedExpenses = localStorage.getItem(expensesStorageKey);
+    const storedExpenses = sharedSnapshot
+        ? JSON.stringify(sharedSnapshot.expenses)
+        : localStorage.getItem(expensesStorageKey);
     if (!storedExpenses) {
         return [];
     }
@@ -259,6 +335,10 @@ function loadExpenses() {
 function saveData() {
     const previousMonthData = monthlyContributions[activeMonth];
     monthlyContributions[activeMonth] = contributions;
+    if (isSharedView) {
+        return true;
+    }
+
     try {
         localStorage.setItem(monthlyStorageKey, JSON.stringify(monthlyContributions));
         storageStatus.innerHTML = '<span class="online-dot" aria-hidden="true"></span> Changes are saved automatically in this browser.';
@@ -296,6 +376,61 @@ function saveExpenses(nextExpenses) {
         document.getElementById("expenseMessage").textContent =
             "Could not save this expense in the browser. Check available storage and try again.";
         return false;
+    }
+}
+
+function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+    }
+
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.setAttribute("readonly", "");
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.select();
+    const copied = document.execCommand("copy");
+    textArea.remove();
+    if (!copied) {
+        throw new Error("The browser could not copy the share link.");
+    }
+    return Promise.resolve();
+}
+
+async function copyShareLink() {
+    const notice = document.getElementById("shareNotice");
+    notice.hidden = false;
+    try {
+        const snapshot = {
+            version: 1,
+            fund: isActivitiesFund ? "activities" : "community",
+            activeMonth,
+            monthlyContributions,
+            receipts,
+            expenses
+        };
+        const bytes = new TextEncoder().encode(JSON.stringify(snapshot));
+        let binaryData = "";
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+            binaryData += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+        }
+        const encodedData = btoa(binaryData).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const url = new URL(window.location.href);
+        url.searchParams.set("fund", isActivitiesFund ? "activities" : "community");
+        url.hash = `share=${encodedData}`;
+        if (url.href.length > 500000) {
+            throw new RangeError("The saved data is too large to fit in a share link.");
+        }
+        await copyTextToClipboard(url.href);
+        notice.textContent =
+            "Share link copied. It contains a read-only snapshot; anyone with the link can view these records.";
+    } catch (error) {
+        console.error("Could not create or copy the share link.", error);
+        notice.textContent = error instanceof RangeError
+            ? "These records are too large to fit in a share link. Export the report instead."
+            : "Could not copy the share link. Check clipboard permission and try again.";
     }
 }
 
@@ -961,12 +1096,14 @@ function selectMonth(monthKey) {
     document.getElementById("currentMonth").textContent = formatMonthName(activeMonth);
     document.getElementById("expenseMonth").textContent = formatMonthName(activeMonth);
     document.getElementById("resetMessage").textContent = "";
-    try {
-        localStorage.setItem(activeMonthStorageKey, activeMonth);
-    } catch (error) {
-        console.error("Could not save the selected collection month.", error);
-        document.getElementById("resetMessage").textContent =
-            "The selected month could not be remembered after closing this page.";
+    if (!isSharedView) {
+        try {
+            localStorage.setItem(activeMonthStorageKey, activeMonth);
+        } catch (error) {
+            console.error("Could not save the selected collection month.", error);
+            document.getElementById("resetMessage").textContent =
+                "The selected month could not be remembered after closing this page.";
+        }
     }
 
     renderMembers();
@@ -1568,6 +1705,7 @@ document.getElementById("changeFundButton").addEventListener("click", () => {
     window.history.replaceState(null, "", window.location.pathname);
     document.getElementById("fundPickerTitle").focus();
 });
+document.getElementById("shareButton").addEventListener("click", copyShareLink);
 document.getElementById("editLockButton").addEventListener("click", () => {
     if (editingUnlocked) {
         editingUnlocked = false;
@@ -1712,12 +1850,26 @@ document.addEventListener("keydown", event => {
 document.querySelectorAll("[data-view]").forEach(button => {
     button.addEventListener("click", () => showView(button.dataset.view));
 });
+document.querySelector(".brand").addEventListener("click", event => {
+    event.preventDefault();
+    showView("overview");
+});
 document.querySelectorAll("[data-open-view]").forEach(button => {
     button.addEventListener("click", () => showView(button.dataset.openView));
 });
 document.getElementById("printButton").addEventListener("click", () => window.print());
 document.getElementById("exportButton").addEventListener("click", exportCsv);
 document.getElementById("resetButton").addEventListener("click", resetRecords);
+document.querySelector(".masthead-status").textContent = isSharedView ? "Shared snapshot" : "Saved locally";
+document.querySelector(".local-badge").textContent = isSharedView ? "Shared snapshot" : "Local records";
+if (isSharedView || sharedSnapshotError) {
+    const shareNotice = document.getElementById("shareNotice");
+    shareNotice.hidden = false;
+    shareNotice.textContent = sharedSnapshotError || "Viewing a read-only snapshot. Anyone with this link can see these records. Updates made after the link was created will not appear here.";
+}
+if (isSharedView) {
+    storageStatus.textContent = "Viewing a read-only snapshot. Changes are not saved.";
+}
 updateEditLockButton();
 
 const loadingScreen = document.getElementById("loadingScreen");
