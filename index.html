@@ -43,16 +43,15 @@
                 <span>Community fund · birthdays and shared activities</span>
                 <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
             </button>
-            <button class="fund-choice-card" type="button" data-select-fund="activities" data-fund="activities">
+            <button class="fund-choice-card" type="button" data-select-fund="activities">
                 <span class="fund-choice-kicker">BOYS’ ACTIVITIES</span>
-                <strong>External Activities Fund <span class="confidential-label">( Highly Confidential
-                        )</span></strong>
+                <strong>External Activities Fund <span class="confidential-label">(PIN required for access)</span></strong>
                 <span>Trips, parties, and other activities · Rs. 100 per member, per week</span>
                 <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
             </button>
         </div>
-        <p class="fund-picker-disclaimer">Members can choose their name and view their own records and receipts.
-            Administrators sign in to add collections, expenses, and edit records.</p>
+        <p class="fund-picker-disclaimer">Member login is read-only. The Community Fund is passwordless; the
+            Activities Fund requires the shared 1111 PIN. Admin login is required to edit.</p>
         <p class="picker-powered-by powered-by">Powered by <strong>DP Creations</strong></p>
     </main>
 
@@ -68,7 +67,7 @@
             <div class="access-choice-actions">
                 <button class="access-choice-button member-choice" id="memberAccessButton" type="button">
                     <strong>Member login</strong>
-                    <span>View my data and receipts without a password</span>
+                    <span>View all records and receipts (read-only; Activities Fund requires its PIN)</span>
                 </button>
                 <button class="access-choice-button admin-choice" id="adminAccessButton" type="button">
                     <strong>Admin login</strong>
@@ -78,32 +77,6 @@
             <div class="modal-actions">
                 <button class="button button-quiet" type="button" data-close-access-choice>Cancel</button>
             </div>
-        </section>
-    </div>
-
-    <div class="modal-backdrop" id="memberLoginModal" hidden>
-        <section class="modal-dialog pin-dialog" role="dialog" aria-modal="true" aria-labelledby="memberLoginTitle">
-            <div class="modal-heading">
-                <div>
-                    <p class="eyebrow">MEMBER VIEW</p>
-                    <h2 id="memberLoginTitle">Choose your name</h2>
-                </div>
-                <button class="icon-button" type="button" data-close-member-login aria-label="Close">×</button>
-            </div>
-            <p class="modal-intro">You can view only the records and receipts belonging to the member you select.</p>
-            <form id="memberLoginForm">
-                <label class="form-field pin-field" for="memberSelector">
-                    <span>Member</span>
-                    <select id="memberSelector" required>
-                        <option value="">Select a member</option>
-                    </select>
-                </label>
-                <p class="form-message" id="memberLoginMessage" role="status" aria-live="polite"></p>
-                <div class="modal-actions">
-                    <button class="button button-quiet" type="button" data-close-member-login>Cancel</button>
-                    <button class="button button-primary" type="submit">View records</button>
-                </div>
-            </form>
         </section>
     </div>
 
@@ -282,7 +255,7 @@
                     <div>
                         <p class="eyebrow" id="memberSectionLabel">YOUR COMMUNITY</p>
                         <h2 id="membersTitle">Meet the members</h2>
-                        <p class="intro-copy">Choose any member to record a collection and create their receipt.</p>
+                        <p class="intro-copy" id="memberIntroCopy">Browse member records and receipts.</p>
                     </div>
                     <span class="member-total" id="visibleMemberCount"></span>
                 </div>
@@ -655,7 +628,7 @@
 
     <script src="supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="script.js?v=20261118-member-receipts"></script>
+    <script src="script.js?v=20261119-shared-member-view"></script>
 </body>
 
 </html>

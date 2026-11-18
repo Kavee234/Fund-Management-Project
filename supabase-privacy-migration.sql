@@ -90,7 +90,10 @@ create policy "Fund admins can update ledgers"
         )
     );
 
-create or replace function public.read_fund_ledger(p_fund_id text)
+drop function if exists public.read_fund_ledger(text);
+drop function if exists public.read_fund_ledger(text, text);
+
+create function public.read_fund_ledger(p_fund_id text, p_pin text)
 returns jsonb
 language plpgsql
 stable
@@ -114,7 +117,13 @@ declare
     v_own_share jsonb;
     v_filtered_expense jsonb;
 begin
-    if v_user_id is null or p_fund_id not in ('fund', 'activitiesFund') then
+    if p_fund_id not in ('fund', 'activitiesFund') then
+        raise exception using errcode = '42501', message = 'Access denied.';
+    end if;
+    if p_fund_id = 'activitiesFund' and p_pin is distinct from '1111' then
+        raise exception using errcode = '42501', message = 'Access denied.';
+    end if;
+    if v_user_id is null then
         raise exception using errcode = '42501', message = 'Access denied.';
     end if;
 
@@ -257,9 +266,9 @@ begin
 end;
 $$;
 
-revoke all on function public.read_fund_ledger(text) from public;
-revoke all on function public.read_fund_ledger(text) from anon;
-grant execute on function public.read_fund_ledger(text) to authenticated;
+revoke all on function public.read_fund_ledger(text, text) from public;
+revoke all on function public.read_fund_ledger(text, text) from anon;
+grant execute on function public.read_fund_ledger(text, text) to authenticated;
 
 create or replace function public.get_member_roster(p_fund_id text)
 returns jsonb
@@ -284,7 +293,11 @@ as $$
       and fund_id = p_fund_id;
 $$;
 
-create or replace function public.read_member_fund_ledger(p_fund_id text, p_member_index integer)
+drop function if exists public.read_member_fund_ledger(text, integer);
+drop function if exists public.read_member_fund_ledger(text);
+drop function if exists public.read_member_fund_ledger(text, text);
+
+create function public.read_member_fund_ledger(p_fund_id text, p_pin text)
 returns jsonb
 language plpgsql
 stable
@@ -295,29 +308,28 @@ declare
     v_data jsonb;
     v_revision bigint;
     v_updated_at timestamptz;
-    v_member jsonb;
-    v_monthly jsonb;
-    v_receipts jsonb;
-    v_expenses jsonb := '[]'::jsonb;
-    v_expense jsonb;
-    v_share jsonb;
-    v_filtered_expense jsonb;
+    v_members jsonb;
 begin
-    if p_fund_id not in ('fund', 'activitiesFund') or p_member_index < 0 then
+    if p_fund_id not in ('fund', 'activitiesFund') then
+        raise exception using errcode = '42501', message = 'Access denied.';
+    end if;
+    if p_fund_id = 'activitiesFund' and p_pin is distinct from '1111' then
         raise exception using errcode = '42501', message = 'Access denied.';
     end if;
 
-    select jsonb_build_object(
-        'name', display_name,
-        'birthday', birthday
+    select coalesce(
+        jsonb_agg(
+            jsonb_build_object(
+                'name', display_name,
+                'birthday', birthday
+            )
+            order by member_index
+        ),
+        '[]'::jsonb
     )
-    into v_member
+    into v_members
     from public.fund_members
-    where fund_id = p_fund_id and member_index = p_member_index;
-
-    if v_member is null then
-        raise exception using errcode = 'P0002', message = 'Member not found.';
-    end if;
+    where fund_id = p_fund_id;
 
     select data, revision, updated_at
     into v_data, v_revision, v_updated_at
@@ -328,63 +340,10 @@ begin
         raise exception using errcode = 'P0002', message = 'Fund ledger not found.';
     end if;
 
-    select coalesce(
-        jsonb_object_agg(
-            month_entry.key,
-            jsonb_build_array(
-                coalesce(
-                    month_entry.value -> p_member_index,
-                    '[false, false, false, false]'::jsonb
-                )
-            )
-        ),
-        '{}'::jsonb
-    )
-    into v_monthly
-    from jsonb_each(coalesce(v_data -> 'monthlyContributions', '{}'::jsonb)) as month_entry(key, value);
-
-    select coalesce(
-        jsonb_agg(jsonb_set(receipt.value, '{memberIndex}', '0'::jsonb, true)
-                  order by receipt.value ->> 'date'),
-        '[]'::jsonb
-    )
-    into v_receipts
-    from jsonb_array_elements(coalesce(v_data -> 'receipts', '[]'::jsonb)) as receipt(value)
-    where (receipt.value ->> 'memberIndex')::integer = p_member_index;
-
-    for v_expense in
-        select expense.value
-        from jsonb_array_elements(coalesce(v_data -> 'expenses', '[]'::jsonb)) as expense(value)
-    loop
-        select share.value
-        into v_share
-        from jsonb_array_elements(coalesce(v_expense -> 'shares', '[]'::jsonb)) as share(value)
-        where (share.value ->> 'memberIndex')::integer = p_member_index
-        limit 1;
-
-        if found then
-            v_filtered_expense := jsonb_set(v_expense, '{shares}', jsonb_build_array(
-                jsonb_set(v_share, '{memberIndex}', '0'::jsonb, true)
-            ), true);
-            v_filtered_expense := jsonb_set(
-                v_filtered_expense,
-                '{costCents}',
-                coalesce(v_share -> 'amountCents', '0'::jsonb),
-                true
-            );
-            v_expenses := v_expenses || jsonb_build_array(v_filtered_expense);
-        end if;
-    end loop;
-
     return jsonb_build_object(
         'role', 'member_viewer',
-        'memberIndex', p_member_index,
-        'members', jsonb_build_array(v_member),
-        'data', jsonb_build_object(
-            'monthlyContributions', v_monthly,
-            'receipts', v_receipts,
-            'expenses', v_expenses
-        ),
+        'members', v_members,
+        'data', v_data,
         'revision', v_revision,
         'updatedAt', v_updated_at
     );
@@ -392,6 +351,8 @@ end;
 $$;
 
 revoke all on function public.get_member_roster(text) from public;
-revoke all on function public.read_member_fund_ledger(text, integer) from public;
+revoke all on function public.read_member_fund_ledger(text, text) from public;
 grant execute on function public.get_member_roster(text) to anon, authenticated;
-grant execute on function public.read_member_fund_ledger(text, integer) to anon, authenticated;
+grant execute on function public.read_member_fund_ledger(text, text) to anon, authenticated;
+
+notify pgrst, 'reload schema';
