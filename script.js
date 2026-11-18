@@ -90,8 +90,8 @@ function updateEditLockButton() {
     button.textContent = authenticatedRole === "member_viewer"
         ? "Read-only member view"
         : sharedBackendConfigured
-        ? (authenticatedRole ? "Sign out" : "Admin login")
-        : "Private storage unavailable";
+            ? (authenticatedRole ? "Sign out" : "Admin login")
+            : "Private storage unavailable";
     button.setAttribute("aria-pressed", String(hasEditAccess));
     button.disabled = authenticatedRole === "member_viewer";
     button.classList.toggle("button-primary", hasEditAccess);
