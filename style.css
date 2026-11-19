@@ -5324,6 +5324,9 @@ body.fund-read-only #importLocalButton {
 }
 
 .powered-by {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     color: var(--muted);
     font-size: 11px;
     letter-spacing: .02em;
@@ -5332,6 +5335,44 @@ body.fund-read-only #importLocalButton {
 .powered-by strong {
     color: var(--green-dark);
     font-weight: 700;
+}
+
+.dp-creations-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-align: left;
+}
+
+.dp-creations-logo {
+    display: block;
+    width: 38px;
+    height: 28px;
+    border-radius: 3px;
+    background: #fff;
+    object-fit: contain;
+}
+
+.dp-creations-copy {
+    display: grid;
+    gap: 2px;
+    line-height: 1.1;
+}
+
+.dp-creations-copy small {
+    color: #929990;
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: .01em;
+}
+
+.loading-powered-by .dp-creations-logo {
+    width: 42px;
+    height: 31px;
+}
+
+.loading-powered-by .dp-creations-copy small {
+    color: #dce5dc;
 }
 
 .picker-powered-by {

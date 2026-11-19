@@ -3,14 +3,22 @@ const accessMode = new URLSearchParams(window.location.search).get("access");
 const hasSelectedFund = fundMode === "community" || fundMode === "activities";
 const isActivitiesFund = fundMode === "activities";
 const activitiesFundPinStorageKey = "activitiesFundPin";
+const communityFundPinStorageKey = "communityFundPin";
 function hasValidActivitiesPin() {
     return sessionStorage.getItem(activitiesFundPinStorageKey) === "1111";
 }
-const hasActivitiesFundAccess = !isActivitiesFund || hasValidActivitiesPin();
+function hasValidCommunityPin() {
+    return sessionStorage.getItem(communityFundPinStorageKey) === "0000";
+}
+const hasSelectedFundAccess = !hasSelectedFund || (isActivitiesFund
+    ? hasValidActivitiesPin()
+    : fundMode === "community"
+        ? hasValidCommunityPin()
+        : true);
 const memberAccessSelected = accessMode === "member";
 const adminAccessSelected = accessMode === "admin";
 const shouldOpenFund = hasSelectedFund && (memberAccessSelected || adminAccessSelected) &&
-    hasActivitiesFundAccess;
+    hasSelectedFundAccess;
 let members = [];
 const receiptBrandName = isActivitiesFund
     ? "External Activities Fund"
@@ -66,11 +74,12 @@ const monthSelector = document.getElementById("monthSelector");
 const transactionFilter = document.getElementById("transactionFilter");
 const expenseMembers = document.getElementById("expenseMembers");
 const storageStatus = document.querySelector(".table-note");
-const activitiesPinModal = document.getElementById("activitiesPinModal");
+const fundPinModal = document.getElementById("fundPinModal");
 const pinModal = document.getElementById("pinModal");
 const collectionModal = document.getElementById("collectionModal");
 const receiptModal = document.getElementById("receiptModal");
 const activitiesPinDigest = "0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c";
+const communityPinDigest = "9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0";
 let monthlyContributions = {};
 let contributions = monthlyContributions[activeMonth] || createEmptyContributions();
 monthlyContributions[activeMonth] = contributions;
@@ -210,34 +219,45 @@ async function submitPin(event) {
     }
 }
 
-function openActivitiesPin() {
-    document.getElementById("activitiesPinMessage").textContent = "";
-    document.getElementById("activitiesPin").value = "";
-    activitiesPinModal.hidden = false;
+function openFundPin() {
+    const targetFund = pendingAccessFund || fundMode || "activities";
+    const isTargetActivitiesFund = targetFund === "activities";
+    document.getElementById("fundPinEyebrow").textContent = isTargetActivitiesFund
+        ? "EXTERNAL ACTIVITIES FUND"
+        : "බාහිර ක්‍රියාකාරකම් අරමුදල";
+    document.getElementById("fundPinIntro").textContent =
+        `Enter the 4-digit PIN to access ${isTargetActivitiesFund ? "the Activities Fund" : "the Community Fund"}.`;
+    document.getElementById("fundPinMessage").textContent = "";
+    document.getElementById("fundPin").value = "";
+    fundPinModal.hidden = false;
     document.body.classList.add("modal-open");
-    document.getElementById("activitiesPin").focus();
+    document.getElementById("fundPin").focus();
 }
 
-function closeActivitiesPin() {
-    closeModalSmooth(activitiesPinModal);
+function closeFundPin() {
+    closeModalSmooth(fundPinModal);
 }
 
-async function submitActivitiesPin(event) {
+async function submitFundPin(event) {
     event.preventDefault();
-    const input = document.getElementById("activitiesPin");
-    const message = document.getElementById("activitiesPinMessage");
+    const input = document.getElementById("fundPin");
+    const message = document.getElementById("fundPinMessage");
     try {
         const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input.value));
         const submittedDigest = Array.from(new Uint8Array(digest), byte =>
             byte.toString(16).padStart(2, "0")).join("");
-        if (submittedDigest !== activitiesPinDigest) {
+        const targetFund = pendingAccessFund || fundMode || "activities";
+        const expectedDigest = targetFund === "community" ? communityPinDigest : activitiesPinDigest;
+        if (submittedDigest !== expectedDigest) {
             message.textContent = "Incorrect PIN. Try again.";
             input.select();
             return;
         }
 
-        sessionStorage.setItem(activitiesFundPinStorageKey, input.value);
-        const targetFund = pendingAccessFund || "activities";
+        sessionStorage.setItem(
+            targetFund === "community" ? communityFundPinStorageKey : activitiesFundPinStorageKey,
+            input.value
+        );
         const targetAccess = pendingAccessMode || accessMode;
         if (targetAccess) {
             window.location.assign(`?fund=${targetFund}&access=${targetAccess}`);
@@ -2066,6 +2086,7 @@ if (hasSelectedFund) {
 
 document.getElementById("changeFundButton").addEventListener("click", () => {
     sessionStorage.removeItem(activitiesFundPinStorageKey);
+    sessionStorage.removeItem(communityFundPinStorageKey);
     document.getElementById("appShell").hidden = true;
     document.getElementById("fundPicker").hidden = false;
     window.history.replaceState(null, "", window.location.pathname);
@@ -2096,11 +2117,11 @@ document.getElementById("accessChoiceModal").addEventListener("click", event => 
 document.getElementById("memberAccessButton").addEventListener("click", () => {
     if (!pendingAccessFund) return;
     pendingAccessMode = "member";
-    if (pendingAccessFund === "activities" &&
-        !hasValidActivitiesPin()) {
+    if ((pendingAccessFund === "activities" && !hasValidActivitiesPin()) ||
+        (pendingAccessFund === "community" && !hasValidCommunityPin())) {
         document.getElementById("accessChoiceModal").hidden = true;
         document.body.classList.remove("modal-open");
-        openActivitiesPin();
+        openFundPin();
         return;
     }
     window.location.assign(`?fund=${pendingAccessFund}&access=member`);
@@ -2108,26 +2129,26 @@ document.getElementById("memberAccessButton").addEventListener("click", () => {
 document.getElementById("adminAccessButton").addEventListener("click", () => {
     if (!pendingAccessFund) return;
     pendingAccessMode = "admin";
-    if (pendingAccessFund === "activities" &&
-        !hasValidActivitiesPin()) {
+    if ((pendingAccessFund === "activities" && !hasValidActivitiesPin()) ||
+        (pendingAccessFund === "community" && !hasValidCommunityPin())) {
         document.getElementById("accessChoiceModal").hidden = true;
         document.body.classList.remove("modal-open");
-        openActivitiesPin();
+        openFundPin();
         return;
     }
     window.location.assign(`?fund=${pendingAccessFund}&access=admin`);
 });
-document.getElementById("activitiesPinForm").addEventListener("submit", submitActivitiesPin);
-document.querySelectorAll("[data-close-activities-pin]").forEach(button => {
+document.getElementById("fundPinForm").addEventListener("submit", submitFundPin);
+document.querySelectorAll("[data-close-fund-pin]").forEach(button => {
     button.addEventListener("click", () => {
-        closeActivitiesPin();
+        closeFundPin();
         pendingAccessFund = null;
         pendingAccessMode = null;
     });
 });
-activitiesPinModal.addEventListener("click", event => {
-    if (event.target === activitiesPinModal) {
-        closeActivitiesPin();
+fundPinModal.addEventListener("click", event => {
+    if (event.target === fundPinModal) {
+        closeFundPin();
         pendingAccessFund = null;
         pendingAccessMode = null;
     }
@@ -2297,8 +2318,8 @@ document.getElementById("anotherCollectionButton").addEventListener("click", () 
 });
 document.addEventListener("keydown", event => {
     if (event.key === "Escape") {
-        if (!activitiesPinModal.hidden) {
-            closeActivitiesPin();
+        if (!fundPinModal.hidden) {
+            closeFundPin();
             pendingAccessFund = null;
             pendingAccessMode = null;
         } else if (!pinModal.hidden) {
@@ -2339,8 +2360,8 @@ if (shouldOpenFund) {
 } else {
     window.setTimeout(() => {
         hideLoadingScreen();
-        if (isActivitiesFund && accessMode && !hasActivitiesFundAccess) {
-            openActivitiesPin();
+        if (hasSelectedFund && accessMode && !hasSelectedFundAccess) {
+            openFundPin();
         }
     }, 1800);
 }

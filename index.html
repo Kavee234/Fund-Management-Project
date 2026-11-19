@@ -24,7 +24,13 @@
             <span class="loading-screen-spinner" aria-hidden="true"></span>
             <span class="loading-screen-message">Preparing your fund</span>
             <span class="loading-progress" aria-hidden="true"><span></span></span>
-            <span class="loading-powered-by">Powered by <strong>DP Creations</strong></span>
+            <span class="loading-powered-by">
+                <span>Powered by</span>
+                <span class="dp-creations-brand">
+                    <img class="dp-creations-logo" src="assets/dp-creations-logo.png" alt="">
+                    <span class="dp-creations-copy"><strong>DP Creations</strong><small>Web Designing</small></span>
+                </span>
+            </span>
         </div>
     </div>
 
@@ -62,7 +68,7 @@
         <div class="fund-choice-grid">
             <button class="fund-choice-card" type="button" data-select-fund="community">
                 <span class="fund-choice-kicker sinhala">ප්‍රධාන අරමුදල</span>
-                <strong class="sinhala">බාහිර ක්‍රියාකාරකම් අරමුදල</strong>
+                <strong class="sinhala">බාහිර ක්‍රියාකාරකම් අරමුදල <span class="confidential-label">(PIN required for access)</span></strong>
                 <span>Community fund · birthdays and shared activities</span>
                 <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
             </button>
@@ -74,9 +80,15 @@
                 <span class="fund-choice-action">Open fund <span aria-hidden="true">→</span></span>
             </button>
         </div>
-        <p class="fund-picker-disclaimer">Member login is read-only. The Community Fund is passwordless; the
-            Activities Fund requires PIN. Admin login is required to edit.</p>
-        <p class="picker-powered-by powered-by">Powered by <strong>DP Creations</strong></p>
+        <p class="fund-picker-disclaimer">Both funds require a PIN to enter. Member login is read-only; admin login is
+            required to edit.</p>
+        <p class="picker-powered-by powered-by">
+            <span>Powered by</span>
+            <span class="dp-creations-brand">
+                <img class="dp-creations-logo" src="assets/dp-creations-logo.png" alt="">
+                <span class="dp-creations-copy"><strong>DP Creations</strong><small>Web Designing</small></span>
+            </span>
+        </p>
     </main>
 
     <div class="modal-backdrop" id="accessChoiceModal" hidden>
@@ -91,7 +103,7 @@
             <div class="access-choice-actions">
                 <button class="access-choice-button member-choice" id="memberAccessButton" type="button">
                     <strong>Member login</strong>
-                    <span>View all records and receipts (read-only; Activities Fund requires its PIN)</span>
+                    <span>View all records and receipts (read-only; fund PIN required)</span>
                 </button>
                 <button class="access-choice-button admin-choice" id="adminAccessButton" type="button">
                     <strong>Admin login</strong>
@@ -490,30 +502,36 @@
             <footer class="page-footer">
                 <span class="sinhala">අපේ එකතුවෙන්, අපේ සතුටට.</span>
                 <span>Made for good times together <span aria-hidden="true">✦</span></span>
-                <span class="powered-by">Powered by <strong>DP Creations</strong></span>
+                <span class="powered-by">
+                    <span>Powered by</span>
+                    <span class="dp-creations-brand">
+                        <img class="dp-creations-logo" src="assets/dp-creations-logo.png" alt="">
+                        <span class="dp-creations-copy"><strong>DP Creations</strong><small>Web Designing</small></span>
+                    </span>
+                </span>
             </footer>
         </main>
     </div>
 
-    <div class="modal-backdrop" id="activitiesPinModal" hidden>
-        <section class="modal-dialog pin-dialog" role="dialog" aria-modal="true" aria-labelledby="activitiesPinTitle">
+    <div class="modal-backdrop" id="fundPinModal" hidden>
+        <section class="modal-dialog pin-dialog" role="dialog" aria-modal="true" aria-labelledby="fundPinTitle">
             <div class="modal-heading">
                 <div>
-                    <p class="eyebrow">EXTERNAL ACTIVITIES FUND</p>
-                    <h2 id="activitiesPinTitle">Enter fund PIN</h2>
+                    <p class="eyebrow" id="fundPinEyebrow">FUND ACCESS</p>
+                    <h2 id="fundPinTitle">Enter fund PIN</h2>
                 </div>
-                <button class="icon-button" type="button" data-close-activities-pin aria-label="Close">×</button>
+                <button class="icon-button" type="button" data-close-fund-pin aria-label="Close">×</button>
             </div>
-            <p class="modal-intro">Enter the 4-digit PIN to continue.</p>
-            <form id="activitiesPinForm">
-                <label class="form-field pin-field" for="activitiesPin">
+            <p class="modal-intro" id="fundPinIntro">Enter the 4-digit PIN to continue.</p>
+            <form id="fundPinForm">
+                <label class="form-field pin-field" for="fundPin">
                     <span>PIN</span>
-                    <input id="activitiesPin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}"
+                    <input id="fundPin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}"
                         maxlength="4" autocomplete="off" required>
                 </label>
-                <p class="form-message" id="activitiesPinMessage" role="status" aria-live="polite"></p>
+                <p class="form-message" id="fundPinMessage" role="status" aria-live="polite"></p>
                 <div class="modal-actions">
-                    <button class="button button-quiet" type="button" data-close-activities-pin>Cancel</button>
+                    <button class="button button-quiet" type="button" data-close-fund-pin>Cancel</button>
                     <button class="button button-primary" type="submit">Continue</button>
                 </div>
             </form>
