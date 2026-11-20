@@ -89,6 +89,25 @@ const fundPinModal = document.getElementById("fundPinModal");
 const pinModal = document.getElementById("pinModal");
 const collectionModal = document.getElementById("collectionModal");
 const receiptModal = document.getElementById("receiptModal");
+const appVisualViewport = window.visualViewport;
+function updateModalViewport() {
+    if (!appVisualViewport) {
+        return;
+    }
+    document.documentElement.style.setProperty(
+        "--app-visual-viewport-height",
+        `${appVisualViewport.height}px`
+    );
+    document.documentElement.style.setProperty(
+        "--app-visual-viewport-offset-top",
+        `${appVisualViewport.offsetTop}px`
+    );
+}
+if (appVisualViewport) {
+    updateModalViewport();
+    appVisualViewport.addEventListener("resize", updateModalViewport);
+    appVisualViewport.addEventListener("scroll", updateModalViewport);
+}
 const activitiesPinDigest = "0ffe1abd1a08215353c233d6e009613e95eec4253832a761af28ff37ac5a150c";
 const communityPinDigest = "9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0";
 let monthlyContributions = {};
