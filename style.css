@@ -7724,3 +7724,193 @@ body.fund-read-only #importLocalButton {
         border-radius: 14px;
     }
 }
+
+@media screen {
+    .masthead-brand {
+        gap: 12px;
+    }
+
+    .masthead-controls {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .masthead-fund-button {
+        min-height: 36px;
+        padding: 0 13px;
+        border-radius: 999px;
+        color: var(--green-dark);
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .masthead-menu {
+        position: relative;
+    }
+
+    .masthead-menu-toggle {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border: 1px solid #e3eadd;
+        border-radius: 50%;
+        background: #fff;
+        color: #536f70;
+        cursor: pointer;
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1;
+        list-style: none;
+        transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+    }
+
+    .masthead-menu-toggle::-webkit-details-marker {
+        display: none;
+    }
+
+    .masthead-menu-toggle:hover,
+    .masthead-menu[open] .masthead-menu-toggle {
+        border-color: #b9ded0;
+        background: #eff8f2;
+        color: var(--green-dark);
+    }
+
+    .masthead-menu-popover {
+        position: absolute;
+        top: calc(100% + 9px);
+        right: 0;
+        z-index: 20;
+        min-width: 170px;
+        padding: 6px;
+        border: 1px solid #e4e9dc;
+        border-radius: 15px;
+        background: #fffef9;
+        box-shadow: 0 12px 30px rgba(48, 73, 68, .15);
+    }
+
+    .masthead-menu-item {
+        width: 100%;
+        min-height: 40px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--ink);
+        cursor: pointer;
+        font: inherit;
+        text-align: left;
+    }
+
+    .masthead-menu-item:hover,
+    .masthead-menu-item:focus-visible {
+        background: #eff8f2;
+        color: var(--green-dark);
+    }
+}
+
+@media screen and (max-width: 760px) {
+    .masthead-brand {
+        gap: 8px;
+    }
+
+    .masthead-fund-button {
+        min-height: 34px;
+        padding: 0 11px;
+        font-size: 11px;
+    }
+
+    .masthead-menu-toggle {
+        width: 35px;
+        height: 35px;
+    }
+}
+
+@media screen and (max-width: 380px) {
+    .masthead-brand {
+        gap: 5px;
+    }
+
+    .masthead-brand .brand {
+        gap: 7px;
+    }
+
+    .masthead-brand .brand-logo {
+        width: 38px;
+        height: 38px;
+    }
+
+    .masthead-fund-button {
+        padding: 0 8px;
+        font-size: 10px;
+    }
+}
+
+.pull-refresh-indicator[hidden] {
+    display: none;
+}
+
+.pull-refresh-indicator {
+    --pull-offset: 18px;
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    left: 50%;
+    z-index: 1100;
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    transform: translate(-50%, calc(-100% + var(--pull-offset)));
+    border: 1px solid #dfe9df;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .96);
+    box-shadow: 0 8px 24px rgba(48, 73, 68, .14);
+    color: #536f70;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform .16s ease, opacity .16s ease;
+}
+
+.pull-refresh-indicator.is-pulling,
+.pull-refresh-indicator.is-refreshing {
+    transform: translate(-50%, 0);
+    opacity: 1;
+}
+
+.pull-refresh-indicator.is-ready {
+    border-color: #b9ded0;
+    color: #1d7169;
+}
+
+.pull-refresh-spinner {
+    width: 17px;
+    height: 17px;
+    border: 2px solid #dcece3;
+    border-top-color: #25847b;
+    border-radius: 50%;
+}
+
+.pull-refresh-indicator.is-refreshing .pull-refresh-spinner {
+    animation: pull-refresh-spin .7s linear infinite;
+}
+
+@keyframes pull-refresh-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pull-refresh-indicator {
+        transition: none;
+    }
+
+    .pull-refresh-indicator.is-refreshing .pull-refresh-spinner {
+        animation-duration: 1.4s;
+    }
+}

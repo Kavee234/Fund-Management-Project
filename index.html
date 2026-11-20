@@ -18,10 +18,14 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20261120-soft-shapes">
+    <link rel="stylesheet" href="style.css?v=20261120-pull-refresh">
 </head>
 
 <body>
+    <div class="pull-refresh-indicator" id="pullRefreshIndicator" role="status" aria-live="polite" hidden>
+        <span class="pull-refresh-spinner" aria-hidden="true"></span>
+        <span id="pullRefreshLabel">Pull to refresh</span>
+    </div>
     <div class="loading-screen" id="loadingScreen" role="status" aria-live="polite">
         <div class="loading-screen-card">
             <img class="loading-screen-logo" src="assets/baahira-logo.png" alt="">
@@ -132,6 +136,21 @@
                         <span class="brand-caption sinhala" id="brandCaption">අපේ එකතුව</span>
                     </span>
                 </a>
+                <div class="masthead-controls">
+                    <button class="button button-quiet masthead-fund-button" id="changeFundButton" type="button">
+                        Choose fund
+                    </button>
+                    <details class="masthead-menu">
+                        <summary class="masthead-menu-toggle" aria-label="More options" title="More options">
+                            <span aria-hidden="true">⋮</span>
+                        </summary>
+                        <div class="masthead-menu-popover">
+                            <button class="masthead-menu-item" id="changeLoginButton" type="button" role="menuitem">
+                                Change login
+                            </button>
+                        </div>
+                    </details>
+                </div>
                 <span class="masthead-tagline">A shared fund for the moments we make together.</span>
             </div>
             <nav class="navigation" aria-label="Main navigation">
@@ -165,7 +184,6 @@
                     <button class="button button-quiet" id="editLockButton" type="button" aria-pressed="false">
                         Unlock editing
                     </button>
-                    <button class="button button-quiet" id="changeFundButton" type="button">Choose fund</button>
                     <button class="button button-quiet" id="importLocalButton" type="button" hidden>Import this
                         browser’s records</button>
                     <label class="month-picker-group" for="monthSelector">
@@ -676,7 +694,7 @@
 
     <script src="supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="script.js?v=20261120-pwa"></script>
+    <script src="script.js?v=20261120-pull-refresh"></script>
 </body>
 
 </html>

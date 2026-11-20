@@ -2095,14 +2095,61 @@ if (hasSelectedFund) {
     document.body.classList.toggle("no-birthdays", isActivitiesFund);
 }
 
-document.getElementById("changeFundButton").addEventListener("click", () => {
+function returnToFundPicker() {
     sessionStorage.removeItem(activitiesFundPinStorageKey);
     sessionStorage.removeItem(communityFundPinStorageKey);
     document.getElementById("appShell").hidden = true;
     document.getElementById("fundPicker").hidden = false;
+    document.getElementById("accessChoiceModal").hidden = true;
+    document.body.classList.remove("modal-open");
     window.history.replaceState(null, "", window.location.pathname);
     document.getElementById("fundPickerTitle").focus({ preventScroll: true });
     scrollToPageTop();
+}
+
+document.getElementById("changeFundButton").addEventListener("click", returnToFundPicker);
+document.getElementById("changeLoginButton").addEventListener("click", async event => {
+    event.currentTarget.closest(".masthead-menu").open = false;
+    if (sharedBackendConfigured && supabaseClient) {
+        try {
+            if (authenticatedRole) {
+                const { error } = await supabaseClient.auth.signOut();
+                if (error) {
+                    throw error;
+                }
+            }
+            const keepUnimportedLocalData = authenticatedAdmin && localImportAvailable;
+            clearSharedView(!keepUnimportedLocalData);
+        } catch (error) {
+            console.error("Could not change the fund login.", error);
+            setSyncStatus(`Could not change login: ${error.message}`, true);
+            return;
+        }
+    } else {
+        document.getElementById("appShell").hidden = true;
+    }
+
+    pendingAccessFund = fundMode;
+    pendingAccessMode = null;
+    document.getElementById("fundPicker").hidden = false;
+    document.getElementById("accessChoiceModal").hidden = false;
+    document.body.classList.add("modal-open");
+    document.getElementById("memberAccessButton").focus();
+});
+
+document.addEventListener("click", event => {
+    document.querySelectorAll(".masthead-menu[open]").forEach(menu => {
+        if (!menu.contains(event.target)) {
+            menu.open = false;
+        }
+    });
+});
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+        document.querySelectorAll(".masthead-menu[open]").forEach(menu => {
+            menu.open = false;
+        });
+    }
 });
 document.querySelectorAll("[data-select-fund]").forEach(button => {
     button.addEventListener("click", () => {
@@ -2362,6 +2409,82 @@ function hideLoadingScreen() {
     loadingScreen.classList.add("is-hidden");
     loadingScreen.setAttribute("aria-hidden", "true");
 }
+
+const pullRefreshIndicator = document.getElementById("pullRefreshIndicator");
+const pullRefreshLabel = document.getElementById("pullRefreshLabel");
+const pullRefreshThreshold = 88;
+let pullRefreshStartY = null;
+let pullRefreshDistance = 0;
+let pullRefreshTriggered = false;
+
+function resetPullRefresh() {
+    pullRefreshStartY = null;
+    pullRefreshDistance = 0;
+    if (!pullRefreshTriggered) {
+        pullRefreshIndicator.classList.remove("is-pulling");
+        pullRefreshIndicator.classList.remove("is-ready");
+        window.setTimeout(() => {
+            if (!pullRefreshIndicator.classList.contains("is-refreshing")) {
+                pullRefreshIndicator.hidden = true;
+            }
+        }, 160);
+    }
+}
+
+document.addEventListener("touchstart", event => {
+    if (event.touches.length !== 1 || window.scrollY > 0 ||
+        document.body.classList.contains("modal-open") ||
+        event.target.closest("button, a, input, select, textarea, [role='dialog']")) {
+        pullRefreshStartY = null;
+        return;
+    }
+    pullRefreshStartY = event.touches[0].clientY;
+    pullRefreshDistance = 0;
+}, { passive: true });
+
+document.addEventListener("touchmove", event => {
+    if (pullRefreshStartY === null || event.touches.length !== 1 ||
+        window.scrollY > 0 || pullRefreshTriggered) {
+        return;
+    }
+
+    pullRefreshDistance = Math.max(0, event.touches[0].clientY - pullRefreshStartY);
+    if (pullRefreshDistance === 0) {
+        return;
+    }
+
+    if (event.cancelable) {
+        event.preventDefault();
+    }
+    pullRefreshIndicator.hidden = false;
+    pullRefreshIndicator.classList.add("is-pulling");
+    pullRefreshIndicator.classList.toggle("is-ready", pullRefreshDistance >= pullRefreshThreshold);
+    pullRefreshIndicator.style.setProperty(
+        "--pull-offset",
+        `${Math.min(18 + pullRefreshDistance * 0.55, 76)}px`
+    );
+    pullRefreshLabel.textContent = pullRefreshDistance >= pullRefreshThreshold
+        ? "Release to refresh"
+        : "Pull to refresh";
+}, { passive: false });
+
+document.addEventListener("touchend", () => {
+    if (pullRefreshStartY === null) {
+        return;
+    }
+    if (pullRefreshDistance >= pullRefreshThreshold && !pullRefreshTriggered) {
+        pullRefreshTriggered = true;
+        pullRefreshIndicator.classList.remove("is-pulling");
+        pullRefreshIndicator.classList.add("is-refreshing");
+        pullRefreshLabel.textContent = "Refreshing…";
+        window.setTimeout(() => window.location.reload(), 180);
+        return;
+    }
+    resetPullRefresh();
+}, { passive: true });
+
+document.addEventListener("touchcancel", resetPullRefresh, { passive: true });
+
 if (shouldOpenFund) {
     initializeSharedBackend().then(hideLoadingScreen, error => {
         console.error("Could not initialize the shared fund.", error);
