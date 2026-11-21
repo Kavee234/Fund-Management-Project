@@ -7916,3 +7916,225 @@ body.fund-read-only #importLocalButton {
         animation-duration: 1.4s;
     }
 }
+
+.report-filter-fields {
+    display: grid;
+    grid-template-columns: minmax(180px, 1.4fr) repeat(2, minmax(150px, 1fr)) auto;
+    align-items: end;
+    gap: 14px;
+}
+
+.report-filter-fields .form-field {
+    min-width: 0;
+}
+
+.report-filter-fields input,
+.report-filter-fields select {
+    width: 100%;
+}
+
+.report-help,
+.report-footnote {
+    color: var(--muted);
+    font-size: .88rem;
+}
+
+.report-help {
+    margin: 14px 0 0;
+}
+
+.report-document {
+    margin-top: 20px;
+    padding: clamp(18px, 3vw, 32px);
+}
+
+.report-document-heading {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+}
+
+.report-document-heading img {
+    width: 68px;
+    height: 68px;
+    object-fit: contain;
+}
+
+.report-document-heading .eyebrow {
+    margin: 0 0 5px;
+}
+
+.report-document-heading h2 {
+    margin: 0;
+}
+
+.report-document-heading p:last-child {
+    margin: 5px 0 0;
+    color: var(--muted);
+}
+
+.report-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin: 20px 0 28px;
+}
+
+.report-summary-grid>div {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--mint);
+}
+
+.report-summary-grid span {
+    color: var(--muted);
+    font-size: .78rem;
+}
+
+.report-summary-grid strong {
+    font-size: 1rem;
+}
+
+.report-transactions-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.report-transactions-heading h3 {
+    margin: 0;
+}
+
+.report-transactions-heading span {
+    color: var(--muted);
+    font-size: .85rem;
+}
+
+.report-table-scroll {
+    overflow-x: auto;
+}
+
+.report-table {
+    width: 100%;
+    min-width: 650px;
+}
+
+.report-footnote {
+    margin: 16px 0 0;
+}
+
+.expense-receipt-content .expense-receipt-shares {
+    margin: 24px 0;
+}
+
+.expense-receipt-shares h4 {
+    margin: 0 0 10px;
+}
+
+.expense-receipt-share-row {
+    display: grid;
+    grid-template-columns: minmax(100px, 1.2fr) repeat(2, minmax(130px, 1fr));
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: .9rem;
+}
+
+.expense-receipt-share-row span {
+    color: var(--muted);
+}
+
+.receipt-actions [hidden] {
+    display: none !important;
+}
+
+@media (max-width: 760px) {
+    .report-filter-fields {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .report-filter-fields .button {
+        grid-column: 1 / -1;
+    }
+
+    .report-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .expense-receipt-share-row {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .expense-receipt-share-row strong {
+        grid-column: 1 / -1;
+    }
+}
+
+@media print {
+    body.printing-report {
+        background: #fff !important;
+        color: #18221e !important;
+    }
+
+    body.printing-report .sidebar,
+    body.printing-report .topbar,
+    body.printing-report .sync-notice,
+    body.printing-report .page-footer,
+    body.printing-report #reportsView> :not(.report-document) {
+        display: none !important;
+    }
+
+    body.printing-report .main-content {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    body.printing-report .view-panel:not(#reportsView) {
+        display: none !important;
+    }
+
+    body.printing-report #reportsView,
+    body.printing-report .report-document {
+        display: block !important;
+    }
+
+    body.printing-report .report-document {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        background: #fff;
+        color: #18221e;
+        box-shadow: none;
+    }
+
+    body.printing-report .report-summary-grid>div {
+        border-color: #d8ddd5;
+        background: #f5f7f2;
+    }
+
+    body.printing-report .report-document-heading h2,
+    body.printing-report .report-summary-grid strong,
+    body.printing-report .report-transactions-heading h3 {
+        color: #18221e;
+    }
+
+    body.printing-report .report-table-scroll {
+        overflow: visible;
+    }
+
+    body.printing-report .report-table {
+        min-width: 0;
+    }
+
+    body.printing-report .report-table tr {
+        break-inside: avoid;
+    }
+}

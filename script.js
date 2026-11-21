@@ -117,6 +117,8 @@ let receipts = [];
 let expenses = [];
 let activeMemberIndex = null;
 let activeReceipt = null;
+let reportMemberIndex = null;
+let reportAccountMemberIndex = null;
 let pendingEditAction = null;
 let collectionMode = "weekly";
 let pendingAccessFund = fundMode;
@@ -391,6 +393,24 @@ function renderMemberFilters() {
         option.textContent = member.name;
         transactionFilter.appendChild(option);
     });
+    const reportMember = document.getElementById("reportMember");
+    reportMember.replaceChildren();
+    members.forEach((member, index) => {
+        if (reportAccountMemberIndex !== null && index !== reportAccountMemberIndex) {
+            return;
+        }
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = member.name;
+        reportMember.appendChild(option);
+    });
+    reportMember.disabled = reportAccountMemberIndex !== null || reportMember.options.length < 2;
+    if (reportAccountMemberIndex !== null && members[reportAccountMemberIndex]) {
+        reportMember.value = String(reportAccountMemberIndex);
+    } else if (reportMemberIndex !== null && members[reportMemberIndex]) {
+        reportMember.value = String(reportMemberIndex);
+    }
+    reportMemberIndex = reportMember.value === "" ? null : Number(reportMember.value);
 }
 
 function loadMonthlyData() {
@@ -579,6 +599,12 @@ function activateSharedAccess(snapshot) {
         name: member.name,
         ...(typeof member.birthday === "string" ? { birthday: member.birthday } : {})
     }));
+    reportAccountMemberIndex = snapshot.role === "community_member"
+        ? 0
+        : snapshot.role === "activities_viewer" && Number.isInteger(snapshot.memberIndex)
+            ? snapshot.memberIndex
+            : null;
+    reportMemberIndex = reportAccountMemberIndex;
     applyFundData(snapshot.data);
     renderMemberFilters();
     renderExpenseMembers();
@@ -648,6 +674,8 @@ function clearSharedView(clearLocalCache = true) {
     localImportAvailable = false;
     localImportData = null;
     members = [];
+    reportMemberIndex = null;
+    reportAccountMemberIndex = null;
     monthlyContributions = {};
     contributions = createEmptyContributions();
     receipts = [];
@@ -1112,6 +1140,118 @@ function getMemberSavingsCents(memberIndex, month) {
         getMemberExpenseCentsThrough(memberIndex, month);
 }
 
+function getRecordDate(dateValue, month) {
+    if (dateValue) {
+        const parsedDate = new Date(dateValue);
+        if (!Number.isNaN(parsedDate.getTime())) {
+            return parsedDate;
+        }
+    }
+    return new Date(`${month}-01T12:00:00`);
+}
+
+function getDateKey(date) {
+    return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, "0"),
+        String(date.getDate()).padStart(2, "0")
+    ].join("-");
+}
+
+function getMemberLedgerEntries(memberIndex) {
+    const entries = [];
+    const recordedWeeks = new Set();
+    receipts.forEach(receipt => {
+        const receiptMemberIndex = Number.isInteger(receipt.memberIndex)
+            ? receipt.memberIndex
+            : members.findIndex(member => member.name === receipt.memberName);
+        if (receiptMemberIndex !== memberIndex) {
+            return;
+        }
+        const month = receipt.month ||
+            (receipt.date ? getMonthKey(new Date(receipt.date)) : "");
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+            return;
+        }
+        const amountCents = Number.isSafeInteger(receipt.amountCents)
+            ? receipt.amountCents
+            : Math.round(Number(receipt.amount) * 100);
+        if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+            return;
+        }
+        const date = getRecordDate(receipt.date, month);
+        if (receipt.type === "additional") {
+            entries.push({
+                date,
+                category: "extra",
+                details: receipt.description
+                    ? `Extra collection · ${receipt.description}`
+                    : "Extra collection",
+                amountCents
+            });
+            return;
+        }
+
+        const weeks = Array.isArray(receipt.weeks)
+            ? receipt.weeks.filter(week => Number.isInteger(week) && week >= 1 && week <= 4)
+            : [];
+        weeks.forEach(week => recordedWeeks.add(`${month}:${week}`));
+        entries.push({
+            date,
+            category: "weekly",
+            details: weeks.length
+                ? `Weekly collection · ${weeks.map(week => `Week ${week}`).join(", ")}`
+                : "Weekly collection",
+            amountCents,
+            receipt
+        });
+    });
+
+    Object.entries(monthlyContributions).forEach(([month, monthData]) => {
+        const memberWeeks = monthData[memberIndex] || [];
+        memberWeeks.forEach((isPaid, weekIndex) => {
+            const week = weekIndex + 1;
+            if (isPaid && !recordedWeeks.has(`${month}:${week}`)) {
+                entries.push({
+                    date: getRecordDate("", month),
+                    category: "weekly",
+                    details: `Weekly collection · Week ${week}`,
+                    amountCents: weeklyContribution * 100
+                });
+            }
+        });
+    });
+
+    expenses.forEach(expense => {
+        const share = expense.shares.find(item => item.memberIndex === memberIndex);
+        if (!share) {
+            return;
+        }
+        entries.push({
+            date: getRecordDate(expense.date, expense.month),
+            category: "expense",
+            details: `Expense share · ${expense.eventName}`,
+            amountCents: -share.amountCents,
+            expense
+        });
+    });
+    return entries.sort((first, second) => first.date - second.date);
+}
+
+function getMemberBalanceThroughDate(memberIndex, endDateKey) {
+    return getMemberLedgerEntries(memberIndex).reduce((total, entry) => {
+        const isThroughDate = endDateKey instanceof Date
+            ? entry.date <= endDateKey
+            : getDateKey(entry.date) <= endDateKey;
+        return isThroughDate ? total + entry.amountCents : total;
+    }, 0);
+}
+
+function getFundBalanceThroughDate(endDateKey) {
+    return members.reduce((total, _, memberIndex) =>
+        total + getMemberBalanceThroughDate(memberIndex, endDateKey), 0);
+}
+
 function getMonthExpenseCents(month) {
     return expenses.reduce((total, expense) =>
         expense.month === month ? total + expense.costCents : total, 0);
@@ -1335,7 +1475,8 @@ function renderTransactions() {
                 memberIndex: share.memberIndex,
                 type: "Expense",
                 details: `${expense.eventName} · Rs. ${formatCurrency(expense.costCents / 100)} total`,
-                amountCents: -share.amountCents
+                amountCents: -share.amountCents,
+                expense
             });
         });
     });
@@ -1379,6 +1520,14 @@ function renderTransactions() {
             receiptButton.textContent = "View / print";
             receiptButton.setAttribute("aria-label", `View or print ${members[transaction.memberIndex].name}'s receipt`);
             receiptButton.addEventListener("click", () => showReceipt(transaction.receipt));
+            receiptCell.appendChild(receiptButton);
+        } else if (transaction.expense) {
+            const receiptButton = document.createElement("button");
+            receiptButton.type = "button";
+            receiptButton.className = "text-button transaction-receipt-button";
+            receiptButton.textContent = "View / print";
+            receiptButton.setAttribute("aria-label", `View or print the ${transaction.expense.eventName} expense receipt`);
+            receiptButton.addEventListener("click", () => showExpenseReceipt(transaction.expense));
             receiptCell.appendChild(receiptButton);
         } else {
             receiptCell.textContent = "—";
@@ -1485,7 +1634,7 @@ function scrollToPageTop() {
 }
 
 function showView(viewName) {
-    ["overview", "members", "summary", "transactions"].forEach(name => {
+    ["overview", "members", "summary", "transactions", "reports"].forEach(name => {
         const panel = document.getElementById(`${name}View`);
         if (name === viewName) {
             panel.hidden = false;
@@ -1572,6 +1721,111 @@ function exportCsv() {
     link.download = isActivitiesFund ? "external-activities-fund.csv" : "baahira-community-fund.csv";
     link.click();
     URL.revokeObjectURL(url);
+}
+
+function prepareMemberReport() {
+    const reportMessage = document.getElementById("reportMessage");
+    const memberIndex = Number(document.getElementById("reportMember").value);
+    const startDate = document.getElementById("reportStartDate").value;
+    const endDate = document.getElementById("reportEndDate").value;
+    reportMessage.textContent = "";
+    if (!members[memberIndex] ||
+        (reportAccountMemberIndex !== null && memberIndex !== reportAccountMemberIndex)) {
+        reportMessage.textContent = "Select an available member for this report.";
+        return;
+    }
+    const parsedStartDate = new Date(`${startDate}T12:00:00`);
+    const parsedEndDate = new Date(`${endDate}T12:00:00`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(endDate) ||
+        Number.isNaN(parsedStartDate.getTime()) || getDateKey(parsedStartDate) !== startDate ||
+        Number.isNaN(parsedEndDate.getTime()) || getDateKey(parsedEndDate) !== endDate ||
+        startDate > endDate) {
+        reportMessage.textContent = "Choose a valid date range, with the start date on or before the end date.";
+        return;
+    }
+
+    const startDateKey = getDateKey(new Date(`${startDate}T12:00:00`));
+    const endDateKey = getDateKey(new Date(`${endDate}T12:00:00`));
+    const entries = getMemberLedgerEntries(memberIndex);
+    const periodEntries = entries.filter(entry => {
+        const dateKey = getDateKey(entry.date);
+        return dateKey >= startDateKey && dateKey <= endDateKey;
+    });
+    const weeklyTotal = periodEntries
+        .filter(entry => entry.category === "weekly")
+        .reduce((total, entry) => total + entry.amountCents, 0);
+    const extraTotal = periodEntries
+        .filter(entry => entry.category === "extra")
+        .reduce((total, entry) => total + entry.amountCents, 0);
+    const expenseTotal = periodEntries
+        .filter(entry => entry.category === "expense")
+        .reduce((total, entry) => total - entry.amountCents, 0);
+    document.getElementById("reportFundName").textContent =
+        isActivitiesFund ? "EXTERNAL ACTIVITIES FUND" : "BAAHIRA COMMUNITY FUND";
+    document.getElementById("reportMemberName").textContent = members[memberIndex].name;
+    document.getElementById("reportPeriod").textContent =
+        `${new Intl.DateTimeFormat("en-LK", { dateStyle: "medium" }).format(new Date(`${startDate}T12:00:00`))} – ${new Intl.DateTimeFormat("en-LK", { dateStyle: "medium" }).format(new Date(`${endDate}T12:00:00`))}`;
+    document.getElementById("reportWeeklyTotal").textContent = formatCurrency(weeklyTotal / 100);
+    document.getElementById("reportExtraTotal").textContent = formatCurrency(extraTotal / 100);
+    document.getElementById("reportExpenseTotal").textContent = formatCurrency(expenseTotal / 100);
+    document.getElementById("reportFinalBalance").textContent = formatCurrency(
+        getMemberBalanceThroughDate(memberIndex, endDateKey) / 100
+    );
+    document.getElementById("reportTransactionCount").textContent =
+        `${periodEntries.length} transaction${periodEntries.length === 1 ? "" : "s"}`;
+
+    const transactionRows = document.getElementById("reportTransactions");
+    transactionRows.replaceChildren();
+    const previousDate = new Date(`${startDate}T12:00:00`);
+    previousDate.setDate(previousDate.getDate() - 1);
+    let runningBalance = getMemberBalanceThroughDate(memberIndex, getDateKey(previousDate));
+    if (periodEntries.length === 0) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 5;
+        cell.className = "empty-transaction-cell";
+        cell.textContent = "No transactions were recorded in this date range.";
+        row.appendChild(cell);
+        transactionRows.appendChild(row);
+    } else {
+        periodEntries.forEach(entry => {
+            runningBalance += entry.amountCents;
+            const row = document.createElement("tr");
+            const dateCell = document.createElement("td");
+            dateCell.textContent = new Intl.DateTimeFormat("en-LK", { dateStyle: "medium" })
+                .format(entry.date);
+            const typeCell = document.createElement("td");
+            typeCell.textContent = entry.category === "weekly"
+                ? "Collection"
+                : entry.category === "extra"
+                    ? "Extra collection"
+                    : "Expense";
+            if (entry.category === "expense") {
+                typeCell.className = "transaction-expense";
+            }
+            const detailsCell = document.createElement("td");
+            detailsCell.textContent = entry.details;
+            const amountCell = document.createElement("td");
+            amountCell.className = entry.amountCents < 0 ? "transaction-expense" : "transaction-collection";
+            amountCell.textContent = `${entry.amountCents < 0 ? "−" : "+"}Rs. ${formatCurrency(
+                Math.abs(entry.amountCents) / 100
+            )}`;
+            const balanceCell = document.createElement("td");
+            balanceCell.textContent = `Rs. ${formatCurrency(runningBalance / 100)}`;
+            row.append(dateCell, typeCell, detailsCell, amountCell, balanceCell);
+            transactionRows.appendChild(row);
+        });
+    }
+    document.getElementById("reportDocument").hidden = false;
+    const previousTitle = document.title;
+    document.title = `${members[memberIndex].name} report ${startDate} to ${endDate}`;
+    document.body.classList.add("printing-report");
+    window.addEventListener("afterprint", () => {
+        document.body.classList.remove("printing-report");
+        document.title = previousTitle;
+    }, { once: true });
+    window.print();
 }
 
 async function resetRecords() {
@@ -1662,6 +1916,7 @@ async function saveExpenseAfterUnlock() {
     updateSummary();
     renderTransactions();
     message.textContent = `“${eventName}” was recorded, and savings were updated for ${participantIndexes.length} member${participantIndexes.length === 1 ? "" : "s"}.`;
+    showExpenseReceipt(expense);
 }
 
 function openCollection(memberIndex, initialMode = "weekly") {
@@ -1877,6 +2132,12 @@ async function saveCollection() {
 
 function showReceipt(receipt) {
     activeReceipt = receipt;
+    receiptModal.querySelector(".receipt-dialog").setAttribute("aria-labelledby", "receiptTitle");
+    document.getElementById("paymentReceiptContent").hidden = false;
+    document.getElementById("expenseReceiptContent").hidden = true;
+    document.getElementById("receiptPngButton").hidden = false;
+    document.getElementById("anotherCollectionButton").hidden = false;
+    document.querySelector("#paymentReceiptContent .receipt-stamp").textContent = "PAID";
     document.getElementById("receiptNumber").textContent = receipt.id;
     document.getElementById("receiptDate").textContent =
         new Intl.DateTimeFormat("en-LK", { dateStyle: "medium", timeStyle: "short" })
@@ -1891,6 +2152,46 @@ function showReceipt(receipt) {
     document.getElementById("receiptMonth").textContent = formatMonthName(receiptMonth);
     document.getElementById("receiptMethod").textContent = receipt.method;
     document.getElementById("receiptAmount").textContent = formatCurrency(receipt.amount);
+    document.getElementById("receiptMessage").textContent = "";
+    receiptModal.hidden = false;
+    document.body.classList.add("modal-open");
+}
+
+function showExpenseReceipt(expense) {
+    activeReceipt = null;
+    receiptModal.querySelector(".receipt-dialog").setAttribute("aria-labelledby", "expenseReceiptTitle");
+    document.getElementById("paymentReceiptContent").hidden = true;
+    document.getElementById("expenseReceiptContent").hidden = false;
+    document.getElementById("receiptPngButton").hidden = true;
+    document.getElementById("anotherCollectionButton").hidden = true;
+    document.getElementById("expenseReceiptNumber").textContent = expense.id;
+    document.getElementById("expenseReceiptDate").textContent =
+        new Intl.DateTimeFormat("en-LK", { dateStyle: "medium", timeStyle: "short" })
+            .format(getRecordDate(expense.date, expense.month));
+    document.getElementById("expenseReceiptEvent").textContent = expense.eventName;
+    document.getElementById("expenseReceiptMonth").textContent = formatMonthName(expense.month);
+    document.getElementById("expenseReceiptTotal").textContent = formatCurrency(expense.costCents / 100);
+
+    const expenseDate = getRecordDate(expense.date, expense.month);
+    const shareRows = document.getElementById("expenseReceiptShares");
+    shareRows.replaceChildren();
+    expense.shares.forEach(share => {
+        const row = document.createElement("div");
+        row.className = "expense-receipt-share-row";
+        const memberName = document.createElement("strong");
+        memberName.textContent = members[share.memberIndex].name;
+        const amount = document.createElement("span");
+        amount.textContent = `Share: Rs. ${formatCurrency(share.amountCents / 100)}`;
+        const balance = document.createElement("span");
+        balance.textContent = `Balance: Rs. ${formatCurrency(
+            getMemberBalanceThroughDate(share.memberIndex, expenseDate) / 100
+        )}`;
+        row.append(memberName, amount, balance);
+        shareRows.appendChild(row);
+    });
+    document.getElementById("expenseReceiptBalance").textContent = formatCurrency(
+        getFundBalanceThroughDate(expenseDate) / 100
+    );
     document.getElementById("receiptMessage").textContent = "";
     receiptModal.hidden = false;
     document.body.classList.add("modal-open");
@@ -2253,6 +2554,8 @@ document.getElementById("editLockButton").addEventListener("click", async () => 
             localImportAvailable = false;
             localImportData = null;
             members = [];
+            reportMemberIndex = null;
+            reportAccountMemberIndex = null;
             monthlyContributions = {};
             contributions = createEmptyContributions();
             receipts = [];
@@ -2291,6 +2594,14 @@ pinModal.addEventListener("click", event => {
 });
 
 monthSelector.value = activeMonth;
+document.getElementById("reportStartDate").value = `${activeMonth}-01`;
+document.getElementById("reportEndDate").value = activeMonth === currentMonthKey
+    ? getDateKey(new Date())
+    : getDateKey(new Date(
+        Number(activeMonth.slice(0, 4)),
+        Number(activeMonth.slice(5, 7)),
+        0
+    ));
 document.getElementById("currentMonth").textContent = formatMonthName(activeMonth);
 document.getElementById("expenseMonth").textContent = formatMonthName(activeMonth);
 document.getElementById("membersCount").textContent = String(members.length);
@@ -2348,6 +2659,10 @@ searchInput.addEventListener("input", renderMembers);
 statusFilter.addEventListener("change", renderMembers);
 monthSelector.addEventListener("change", () => selectMonth(monthSelector.value));
 transactionFilter.addEventListener("change", renderTransactions);
+document.getElementById("reportMember").addEventListener("change", event => {
+    reportMemberIndex = Number(event.currentTarget.value);
+});
+document.getElementById("generateReportButton").addEventListener("click", prepareMemberReport);
 expenseMembers.addEventListener("change", updateExpensePreview);
 document.getElementById("expenseCost").addEventListener("input", updateExpensePreview);
 document.getElementById("expenseForm").addEventListener("submit", saveExpense);

@@ -1,9 +1,9 @@
-const CACHE_NAME = "external-activities-fund-shell-v3";
+const CACHE_NAME = "external-activities-fund-shell-v4";
 const APP_SHELL = [
     "./index.html",
-    "./style.css?v=20261120-pull-refresh",
+    "./style.css?v=20261121-member-reports",
     "./supabase-config.js",
-    "./script.js?v=20261120-pull-refresh",
+    "./script.js?v=20261121-member-reports",
     "./assets/baahira-logo.png",
     "./assets/dp-creations-logo.png",
     "./assets/app-icon-192.png",

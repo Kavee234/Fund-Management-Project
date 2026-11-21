@@ -18,7 +18,7 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20261120-pull-refresh">
+    <link rel="stylesheet" href="style.css?v=20261121-member-reports">
 </head>
 
 <body>
@@ -165,6 +165,9 @@
                 </button>
                 <button class="nav-link" type="button" data-view="transactions">
                     <span class="nav-index">04</span> Transactions
+                </button>
+                <button class="nav-link" type="button" data-view="reports">
+                    <span class="nav-index">05</span> Reports
                 </button>
             </nav>
             <div class="masthead-status">
@@ -486,8 +489,7 @@
                         <p class="form-message" id="expenseMessage" role="status" aria-live="polite"></p>
                         <div class="expense-form-actions">
                             <span>Recorded under <strong id="expenseMonth"></strong></span>
-                            <button class="button button-primary" type="submit">Add expense &amp; update
-                                savings</button>
+                            <button class="button button-primary" type="submit">Add expense &amp; show receipt</button>
                         </div>
                     </form>
                 </section>
@@ -521,6 +523,78 @@
                     <div class="table-note">Contributions are shown as money in; each member’s share of an expense is
                         shown as money out.</div>
                 </section>
+            </section>
+
+            <section class="view-panel" id="reportsView" aria-labelledby="reportsTitle" hidden>
+                <div class="members-intro">
+                    <div>
+                        <p class="eyebrow">PERSONAL FUND STATEMENT</p>
+                        <h2 id="reportsTitle">Member reports</h2>
+                        <p class="intro-copy">Choose a member and date range to print or save a detailed PDF statement.
+                        </p>
+                    </div>
+                </div>
+                <section class="panel reports-controls" aria-label="Report options">
+                    <div class="report-filter-fields">
+                        <label class="form-field" for="reportMember">
+                            <span>Member</span>
+                            <select id="reportMember" aria-label="Select report member"></select>
+                        </label>
+                        <label class="form-field" for="reportStartDate">
+                            <span>From</span>
+                            <input id="reportStartDate" type="date" required>
+                        </label>
+                        <label class="form-field" for="reportEndDate">
+                            <span>To</span>
+                            <input id="reportEndDate" type="date" required>
+                        </label>
+                        <button class="button button-primary" id="generateReportButton" type="button">Prepare PDF
+                            report</button>
+                    </div>
+                    <p class="report-help">Use your browser’s print dialog and choose “Save as PDF” to download the
+                        report.</p>
+                    <p class="form-message" id="reportMessage" role="status" aria-live="polite"></p>
+                </section>
+                <article class="panel report-document" id="reportDocument" aria-live="polite" hidden>
+                    <div class="report-document-heading">
+                        <img src="assets/baahira-logo.png" alt="">
+                        <div>
+                            <p class="eyebrow" id="reportFundName">COMMUNITY FUND</p>
+                            <h2 id="reportMemberName"></h2>
+                            <p id="reportPeriod"></p>
+                        </div>
+                    </div>
+                    <div class="report-summary-grid">
+                        <div><span>Weekly collections</span><strong>Rs. <span id="reportWeeklyTotal">0</span></strong>
+                        </div>
+                        <div><span>Extra collections</span><strong>Rs. <span id="reportExtraTotal">0</span></strong>
+                        </div>
+                        <div><span>Expense shares</span><strong>Rs. <span id="reportExpenseTotal">0</span></strong>
+                        </div>
+                        <div><span>Final balance as of period end</span><strong>Rs. <span
+                                    id="reportFinalBalance">0</span></strong></div>
+                    </div>
+                    <div class="report-transactions-heading">
+                        <h3>Activity details</h3>
+                        <span id="reportTransactionCount"></span>
+                    </div>
+                    <div class="table-scroll report-table-scroll">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">DATE</th>
+                                    <th scope="col">TYPE</th>
+                                    <th scope="col">DETAILS</th>
+                                    <th scope="col">AMOUNT (RS.)</th>
+                                    <th scope="col">BALANCE (RS.)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportTransactions"></tbody>
+                        </table>
+                    </div>
+                    <p class="report-footnote">Balance includes this member’s recorded activity through the end date,
+                        including any carried-forward balance.</p>
+                </article>
             </section>
 
             <footer class="page-footer">
@@ -651,36 +725,71 @@
                         <h2 class="sinhala" id="receiptBrandTitle">බාහිර ක්‍රියාකාරකම් අපේ එකතුව</h2>
                     </div>
                 </div>
-                <div class="receipt-title-row">
-                    <div>
-                        <p class="eyebrow">PAYMENT CONFIRMATION</p>
-                        <h3 id="receiptTitle">Payment receipt</h3>
+                <div id="paymentReceiptContent">
+                    <div class="receipt-title-row">
+                        <div>
+                            <p class="eyebrow">PAYMENT CONFIRMATION</p>
+                            <h3 id="receiptTitle">Payment receipt</h3>
+                        </div>
+                        <span class="receipt-stamp">PAID</span>
                     </div>
-                    <span class="receipt-stamp">PAID</span>
+                    <div class="receipt-meta">
+                        <span>Receipt number</span><strong id="receiptNumber"></strong>
+                        <span>Date</span><strong id="receiptDate"></strong>
+                    </div>
+                    <div class="receipt-divider"></div>
+                    <div class="receipt-detail">
+                        <span>Received from</span><strong id="receiptMember"></strong>
+                    </div>
+                    <div class="receipt-detail">
+                        <span id="receiptContributionLabel">Contribution</span><strong id="receiptWeeks"></strong>
+                    </div>
+                    <div class="receipt-detail">
+                        <span>Collection month</span><strong id="receiptMonth"></strong>
+                    </div>
+                    <div class="receipt-detail">
+                        <span>Payment method</span><strong id="receiptMethod"></strong>
+                    </div>
+                    <div class="receipt-total">
+                        <span>Total received</span>
+                        <strong>Rs. <span id="receiptAmount"></span></strong>
+                    </div>
+                    <p class="receipt-thanks sinhala">ඔබගේ දායකත්වයට ස්තුතියි!</p>
+                    <p class="receipt-footnote">This is a soft receipt for your community fund contribution.</p>
                 </div>
-                <div class="receipt-meta">
-                    <span>Receipt number</span><strong id="receiptNumber"></strong>
-                    <span>Date</span><strong id="receiptDate"></strong>
+                <div class="expense-receipt-content" id="expenseReceiptContent" hidden>
+                    <div class="receipt-title-row">
+                        <div>
+                            <p class="eyebrow">EXPENSE CONFIRMATION</p>
+                            <h3 id="expenseReceiptTitle">Expense receipt</h3>
+                        </div>
+                        <span class="receipt-stamp" id="expenseReceiptStamp">RECORDED</span>
+                    </div>
+                    <div class="receipt-meta">
+                        <span>Receipt number</span><strong id="expenseReceiptNumber"></strong>
+                        <span>Date</span><strong id="expenseReceiptDate"></strong>
+                    </div>
+                    <div class="receipt-divider"></div>
+                    <div class="receipt-detail">
+                        <span>Event</span><strong id="expenseReceiptEvent"></strong>
+                    </div>
+                    <div class="receipt-detail">
+                        <span>Expense month</span><strong id="expenseReceiptMonth"></strong>
+                    </div>
+                    <div class="receipt-detail">
+                        <span>Total expense</span><strong>Rs. <span id="expenseReceiptTotal"></span></strong>
+                    </div>
+                    <div class="expense-receipt-shares">
+                        <h4>Member shares and updated balances</h4>
+                        <div id="expenseReceiptShares"></div>
+                    </div>
+                    <div class="receipt-total">
+                        <span>Fund balance after expense</span>
+                        <strong>Rs. <span id="expenseReceiptBalance"></span></strong>
+                    </div>
+                    <p class="receipt-footnote">This receipt confirms the recorded expense and updated fund balances.
+                    </p>
                 </div>
-                <div class="receipt-divider"></div>
-                <div class="receipt-detail">
-                    <span>Received from</span><strong id="receiptMember"></strong>
-                </div>
-                <div class="receipt-detail">
-                    <span id="receiptContributionLabel">Contribution</span><strong id="receiptWeeks"></strong>
-                </div>
-                <div class="receipt-detail">
-                    <span>Collection month</span><strong id="receiptMonth"></strong>
-                </div>
-                <div class="receipt-detail">
-                    <span>Payment method</span><strong id="receiptMethod"></strong>
-                </div>
-                <div class="receipt-total">
-                    <span>Total received</span>
-                    <strong>Rs. <span id="receiptAmount"></span></strong>
-                </div>
-                <p class="receipt-thanks sinhala">ඔබගේ දායකත්වයට ස්තුතියි!</p>
-                <p class="receipt-footnote">This is a soft receipt for your community fund contribution.</p>
             </article>
             <p class="form-message receipt-message" id="receiptMessage" role="status" aria-live="polite"></p>
             <div class="modal-actions receipt-actions">
@@ -694,7 +803,7 @@
 
     <script src="supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="script.js?v=20261120-pull-refresh"></script>
+    <script src="script.js?v=20261121-member-reports"></script>
 </body>
 
 </html>
